@@ -305,6 +305,14 @@ namespace Rats.Sim
         public static Simulation LoadSnapshot(byte[] data, Tunables tunables)
         {
             var sim = new Simulation(tunables);
+            sim.ApplySnapshot(data);
+            return sim;
+        }
+
+        /// <summary>Overwrites this sim's state with a snapshot (a network client does this every update).</summary>
+        public void ApplySnapshot(byte[] data)
+        {
+            var sim = this;
             using var r = new BinaryReader(new MemoryStream(data));
             int version = r.ReadInt32();
             if (version != SnapshotVersion) throw new InvalidDataException($"snapshot version {version}, expected {SnapshotVersion}");
@@ -317,6 +325,7 @@ namespace Rats.Sim
                 f.ActionDir = ReadVec(r); f.ActionHitLanded = r.ReadBoolean(); f.LockedOn = r.ReadBoolean();
             }
             int count = r.ReadInt32();
+            sim.Projectiles.Clear();
             for (int i = 0; i < count; i++)
             {
                 sim.Projectiles.Add(new Projectile
@@ -324,7 +333,6 @@ namespace Rats.Sim
                     Id = r.ReadInt32(), Owner = r.ReadInt32(), Position = ReadVec(r), Velocity = ReadVec(r), AgeTicks = r.ReadInt32(),
                 });
             }
-            return sim;
         }
 
         static void Write(BinaryWriter w, Vec3 v) { w.Write(v.X); w.Write(v.Y); w.Write(v.Z); }

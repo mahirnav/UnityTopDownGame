@@ -15,9 +15,13 @@ namespace Rats.Game
 
         public KeyboardInput(Transform camera) { this.camera = camera; }
 
+        /// <summary>False while a menu has focus: no presses, no movement.</summary>
+        public bool Enabled = true;
+
         /// <summary>Call once per render frame, before stepping the sim.</summary>
         public void Poll()
         {
+            if (!Enabled) { melee = ranged = dash = toggleLock = false; return; }
             if (Input.GetKeyDown(KeyCode.J)) melee = true;
             if (Input.GetKeyDown(KeyCode.K)) ranged = true;
             if (Input.GetKeyDown(KeyCode.Space)) dash = true;
@@ -26,6 +30,7 @@ namespace Rats.Game
 
         public InputFrame Read(int tick)
         {
+            if (!Enabled) return default;
             float right = Axis(KeyCode.D, KeyCode.A), forward = Axis(KeyCode.W, KeyCode.S);
             var camForward = Vector3.ProjectOnPlane(camera.forward, Vector3.up).normalized;
             var camRight = Vector3.Cross(Vector3.up, camForward);
