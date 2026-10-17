@@ -1,2 +1,2 @@
-# UnityTopDownGame
-Mulitplayer PVP top down game
+# UnityThirdPersonGame
+Mulitplayer PVP third person game
