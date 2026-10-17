@@ -1,14 +1,12 @@
 using Rats.Sim;
 using UnityEngine;
-using UnityEngine.Animations;
-using UnityEngine.Playables;
 
 namespace Rats.Game
 {
     /// <summary>
     /// Visual for one fighter. A capsule by default; if the Mixamo placeholder is in
-    /// Resources/Mixamo, the humanoid is shown and its melee clip is posed from the
-    /// sim's swing progress. The animation graph never advances on its own.
+    /// Resources/Mixamo, the humanoid is shown and posed from the sim's swing progress
+    /// with SampleAnimation. Nothing animates on its own, so a freeze holds the pose.
     /// </summary>
     public sealed class CharacterView : MonoBehaviour
     {
@@ -16,11 +14,10 @@ namespace Rats.Game
         const string MeleeResource = "Mixamo/melee";
 
         GameObject capsule;
-        PlayableGraph graph;
-        AnimationClipPlayable meleePlayable;
+        GameObject model;
         AnimationClip meleeClip;
 
-        public bool HasHumanoid => meleeClip != null;
+        public bool HasHumanoid => model != null;
 
         public void Build()
         {
@@ -36,8 +33,7 @@ namespace Rats.Game
 
             if (HasHumanoid)
             {
-                meleePlayable.SetTime(fighter.SwingProgress * meleeClip.length);
-                graph.Evaluate(0f);
+                meleeClip.SampleAnimation(model, fighter.SwingProgress * meleeClip.length);
             }
             else
             {
@@ -50,28 +46,17 @@ namespace Rats.Game
         void TryLoadHumanoid()
         {
             var modelPrefab = Resources.Load<GameObject>(CharacterResource);
-            meleeClip = FindClip(Resources.LoadAll<AnimationClip>(MeleeResource));
-            if (modelPrefab == null || meleeClip == null)
-            {
-                meleeClip = null;
-                return;
-            }
+            var clip = FindClip(Resources.LoadAll<AnimationClip>(MeleeResource));
+            if (modelPrefab == null || clip == null) return;
 
-            var model = Instantiate(modelPrefab, transform);
+            meleeClip = clip;
+            model = Instantiate(modelPrefab, transform);
             model.name = "Humanoid";
             var animator = model.GetComponent<Animator>();
-            if (animator == null) animator = model.AddComponent<Animator>();
-            animator.applyRootMotion = false;
-
-            graph = PlayableGraph.Create("CharacterView");
-            graph.SetTimeUpdateMode(DirectorUpdateMode.Manual);
-            meleePlayable = AnimationClipPlayable.Create(graph, meleeClip);
-            var output = AnimationPlayableOutput.Create(graph, "Animation", animator);
-            output.SetSourcePlayable(meleePlayable);
-            graph.Play();
+            animator.applyRootMotion = false; // no controller: it never animates on its own, only supplies the avatar
 
             capsule.SetActive(false);
-            Debug.Log($"[CharacterView] humanoid loaded, clip '{meleeClip.name}' {meleeClip.length:F2}s, " +
+            Debug.Log($"[CharacterView] humanoid loaded, clip {meleeClip.length:F2}s, " +
                       $"humanoid avatar: {animator.avatar != null && animator.avatar.isHuman}");
         }
 
@@ -80,11 +65,6 @@ namespace Rats.Game
             foreach (var clip in clips)
                 if (!clip.name.StartsWith("__preview__")) return clip;
             return null;
-        }
-
-        void OnDestroy()
-        {
-            if (graph.IsValid()) graph.Destroy();
         }
     }
 }

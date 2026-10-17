@@ -48,10 +48,24 @@ namespace Rats.EditorTools
             bootstrap.InputSource = input;
             var sim = bootstrap.Sim;
 
+            var animator = bootstrap.Character.GetComponentInChildren<Animator>();
+            var hand = animator != null ? animator.GetBoneTransform(HumanBodyBones.RightHand) : null;
+            var body = bootstrap.Character.transform;
+            var idleHand = hand != null ? body.InverseTransformPoint(hand.position) : Vector3.zero;
+
             while (sim.Tick < FreezeTick) StepAndSync(bootstrap);
             sim.Freeze();
             bootstrap.SyncViews(10f); // long delta settles the follow camera, so only sim-driven visuals can differ
             var start = Shot(bootstrap, dir, "unity_frozen_start.png");
+
+            // Regression: an animation path that silently never posed the model still gave identical frames.
+            bool posed = true;
+            if (hand != null)
+            {
+                float moved = Vector3.Distance(body.InverseTransformPoint(hand.position), idleHand);
+                posed = moved > 0.1f;
+                Debug.Log($"[Capture] right hand moved {moved:F2} m from idle to frozen swing pose: {(posed ? "posed" : "NOT POSED")}");
+            }
 
             var clock = new TickClock();
             for (int frame = 0; frame < HoldFrames; frame++)
@@ -67,7 +81,7 @@ namespace Rats.EditorTools
             sim.Resume();
             while (sim.Tick < FreezeTick + 60) StepAndSync(bootstrap);
             Shot(bootstrap, dir, "unity_after_resume.png");
-            return identical ? 0 : 2;
+            return identical && posed ? 0 : 2;
         }
 
         static void StepAndSync(Bootstrap b)
