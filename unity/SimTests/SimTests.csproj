@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <Compile Include="../Assets/Sim/**/*.cs" Link="Sim/%(RecursiveDir)%(Filename)%(Extension)" />
+    <None Include="../Assets/StreamingAssets/tunables.txt" Link="tunables.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

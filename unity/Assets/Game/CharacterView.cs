@@ -4,67 +4,80 @@ using UnityEngine;
 namespace Rats.Game
 {
     /// <summary>
-    /// Visual for one fighter. A capsule by default; if the Mixamo placeholder is in
-    /// Resources/Mixamo, the humanoid is shown and posed from the sim's swing progress
-    /// with SampleAnimation. Nothing animates on its own, so a freeze holds the pose.
+    /// Capsule visual for one fighter, posed entirely from sim state. Color shows the frame-data
+    /// phase of the current action (startup yellow, active red, recovery dark), which makes
+    /// timing readable while tuning. Pips above the head show remaining action points.
     /// </summary>
     public sealed class CharacterView : MonoBehaviour
     {
-        const string CharacterResource = "Mixamo/character";
-        const string MeleeResource = "Mixamo/melee";
+        static readonly Color StartupColor = new Color(1f, 0.85f, 0.2f);
+        static readonly Color ActiveColor = new Color(1f, 0.15f, 0.1f);
+        static readonly Color RecoveryColor = new Color(0.25f, 0.22f, 0.2f);
+        static readonly Color PipOn = new Color(1f, 0.8f, 0.2f);
+        static readonly Color PipOff = new Color(0.2f, 0.2f, 0.2f);
+        const float HitFlashSeconds = 0.12f;
 
-        GameObject capsule;
-        GameObject model;
-        AnimationClip meleeClip;
+        Transform body;
+        Transform pipRoot;
+        Renderer bodyRenderer;
+        Renderer[] pips;
+        Color baseColor;
+        int lastHp = int.MaxValue;
+        float flashUntil;
 
-        public bool HasHumanoid => model != null;
-
-        public void Build()
+        public void Build(Color color, int pipCount)
         {
-            capsule = Primitives.Create(PrimitiveType.Capsule, transform, new Color(0.45f, 0.2f, 0.15f));
+            baseColor = color;
+            body = new GameObject("Body").transform;
+            body.SetParent(transform, false);
+            var capsule = Primitives.Create(PrimitiveType.Capsule, body, color);
             capsule.transform.localPosition = new Vector3(0f, 1f, 0f);
-            TryLoadHumanoid();
+            capsule.transform.localScale = new Vector3(0.8f, 1f, 0.8f); // 0.4 m radius, matches FighterRadius
+            bodyRenderer = capsule.GetComponent<Renderer>();
+            var nose = Primitives.Create(PrimitiveType.Cube, body, Color.black);
+            nose.transform.localPosition = new Vector3(0f, 1.5f, 0.4f);
+            nose.transform.localScale = new Vector3(0.15f, 0.12f, 0.25f);
+
+            pipRoot = new GameObject("Pips").transform;
+            pipRoot.SetParent(transform, false);
+            pipRoot.localPosition = new Vector3(0f, 2.4f, 0f);
+            pips = new Renderer[pipCount];
+            for (int i = 0; i < pipCount; i++)
+            {
+                var pip = Primitives.Create(PrimitiveType.Sphere, pipRoot, PipOn);
+                pip.transform.localPosition = new Vector3((i - (pipCount - 1) * 0.5f) * 0.3f, 0f, 0f);
+                pip.transform.localScale = Vector3.one * 0.18f;
+                pips[i] = pip.GetComponent<Renderer>();
+            }
         }
 
-        public void Sync(Fighter fighter)
+        public void Sync(Fighter fighter, Tunables t, Quaternion cameraRotation)
         {
             transform.position = SimConvert.ToUnity(fighter.Position);
-            transform.rotation = Quaternion.LookRotation(SimConvert.ToUnity(fighter.Facing), Vector3.up);
+            body.rotation = Quaternion.LookRotation(SimConvert.ToUnity(fighter.Facing), Vector3.up);
 
-            if (HasHumanoid)
+            float lean = 0f;
+            var color = baseColor;
+            if (fighter.IsBusy)
             {
-                meleeClip.SampleAnimation(model, fighter.SwingProgress * meleeClip.length);
+                var def = t.Get(fighter.Action);
+                int tick = fighter.ActionTick;
+                color = tick < def.Startup ? StartupColor : def.IsActive(tick) ? ActiveColor : RecoveryColor;
+                float progress = (float)tick / def.Total;
+                lean = fighter.Action == ActionKind.Dash ? 25f
+                     : fighter.Action == ActionKind.Melee ? Mathf.Sin(progress * Mathf.PI) * 35f
+                     : 0f;
             }
-            else
-            {
-                // Capsule fallback: lean forward through the swing so it's visible.
-                float lean = fighter.IsSwinging ? Mathf.Sin(fighter.SwingProgress * Mathf.PI) * 35f : 0f;
-                capsule.transform.localRotation = Quaternion.Euler(lean, 0f, 0f);
-            }
-        }
+            body.localRotation *= Quaternion.Euler(lean, 0f, 0f);
 
-        void TryLoadHumanoid()
-        {
-            var modelPrefab = Resources.Load<GameObject>(CharacterResource);
-            var clip = FindClip(Resources.LoadAll<AnimationClip>(MeleeResource));
-            if (modelPrefab == null || clip == null) return;
+            if (fighter.Hp < lastHp && lastHp != int.MaxValue) flashUntil = Time.unscaledTime + HitFlashSeconds;
+            lastHp = fighter.Hp;
+            if (Time.unscaledTime < flashUntil) color = Color.white; // visual only, never feeds back into the sim
+            bodyRenderer.sharedMaterial.color = color;
 
-            meleeClip = clip;
-            model = Instantiate(modelPrefab, transform);
-            model.name = "Humanoid";
-            var animator = model.GetComponent<Animator>();
-            animator.applyRootMotion = false; // no controller: it never animates on its own, only supplies the avatar
-
-            capsule.SetActive(false);
-            Debug.Log($"[CharacterView] humanoid loaded, clip {meleeClip.length:F2}s, " +
-                      $"humanoid avatar: {animator.avatar != null && animator.avatar.isHuman}");
-        }
-
-        static AnimationClip FindClip(AnimationClip[] clips)
-        {
-            foreach (var clip in clips)
-                if (!clip.name.StartsWith("__preview__")) return clip;
-            return null;
+            pipRoot.rotation = cameraRotation; // pips line up across the screen
+            for (int i = 0; i < pips.Length; i++)
+                pips[i].sharedMaterial.color = i < fighter.ActionPoints ? PipOn : PipOff;
         }
     }
 }

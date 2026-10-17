@@ -1,113 +1,108 @@
 using NUnit.Framework;
 using Rats.Sim;
+using static Rats.SimTests.TestSim;
 
 namespace Rats.SimTests
 {
+    /// <summary>The turn-end freeze stops gameplay exactly mid-action; resuming finishes it as if nothing happened.</summary>
     public class FreezeTests
     {
-        static ScriptedInput FireOnFirstTick()
-        {
-            var input = new ScriptedInput();
-            input.Set(0, new InputFrame { Fire = true });
-            return input;
-        }
+        const int Turn = 60; // short turns keep scenarios small
 
-        static void Run(Simulation sim, IInputSource input, int ticks)
-        {
-            for (int i = 0; i < ticks; i++) sim.Step(input.Read(sim.Tick));
-        }
+        static Simulation WithFreeze(int freezeTicks) => Create(t => { t.TurnTicks = Turn; t.FreezeTicks = freezeTicks; });
 
         [Test]
         public void ProjectileResumesExactlyAfterFreeze()
         {
-            // Reference: fire, then run uninterrupted.
-            var reference = new Simulation();
-            Run(reference, FireOnFirstTick(), 61);
+            // Fire so the projectile is mid-flight when the turn ends. Reference has no freeze at all.
+            var fire = PressAt(40, new InputFrame { Ranged = true });
+            var reference = WithFreeze(0);
+            var sim = WithFreeze(180);
 
-            // Same inputs, but frozen after 31 ticks for 5 s of render frames.
-            var sim = new Simulation();
-            var input = FireOnFirstTick();
-            var clock = new TickClock();
-            Run(sim, input, 31);
+            RunUntil(sim, s => s.IsFrozen, in0: fire);
+            Assert.That(sim.Projectiles.Count, Is.EqualTo(1), "projectile should be in flight at the freeze");
             var p = sim.Projectiles[0];
             var frozenPos = p.Position;
             var frozenVel = p.Velocity;
 
-            sim.Freeze();
-            for (int frame = 0; frame < 300; frame++)
-            {
-                int ticks = clock.Advance(1.0 / 60.0, sim.IsFrozen);
-                for (int t = 0; t < ticks; t++) sim.Step(input.Read(sim.Tick));
-                sim.Step(input.Read(sim.Tick)); // a driver that ignores the clock must not matter either
-            }
-            Assert.That(p.Position, Is.EqualTo(frozenPos), "projectile moved during freeze");
-            Assert.That(p.Velocity, Is.EqualTo(frozenVel), "projectile velocity changed during freeze");
+            RunUntil(sim, s => !s.IsFrozen, in0: fire);
+            Assert.That(p.Position, Is.EqualTo(frozenPos), "projectile moved during the freeze");
+            Assert.That(p.Velocity, Is.EqualTo(frozenVel), "projectile speed changed during the freeze");
 
-            sim.Resume();
-            Run(sim, input, 30);
-
+            int combatTicks = sim.CombatTick + 10;
+            RunUntil(sim, s => s.CombatTick == combatTicks, in0: fire);
+            RunUntil(reference, s => s.CombatTick == combatTicks, in0: fire);
             var refP = reference.Projectiles[0];
-            Assert.That(sim.Tick, Is.EqualTo(reference.Tick));
-            Assert.That(p.Position, Is.EqualTo(refP.Position), "position not bit-exact with uninterrupted run");
-            Assert.That(p.Velocity, Is.EqualTo(refP.Velocity), "velocity not bit-exact with uninterrupted run");
+            Assert.That(p.Position, Is.EqualTo(refP.Position), "position not bit-exact with the unfrozen run");
+            Assert.That(p.Velocity, Is.EqualTo(refP.Velocity), "velocity not bit-exact with the unfrozen run");
         }
 
         [Test]
-        public void FrozenSimIgnoresSteps()
+        public void FrozenDashFinishesWithCorrectDistance()
         {
-            var sim = new Simulation();
-            Run(sim, FireOnFirstTick(), 10);
-            sim.Freeze();
-            var playerPos = sim.Player.Position;
-            var mash = new InputFrame { Fire = true, Melee = true, MoveX = 1f };
-            for (int i = 0; i < 100; i++) sim.Step(mash);
+            var t = new Tunables();
+            // Start the dash so the turn ends in the middle of its active ticks.
+            int start = Turn - t.DashStartup - t.DashActive / 2;
+            var dash = PressAt(start, new InputFrame { Dash = true, MoveZ = 1f });
 
-            Assert.That(sim.Tick, Is.EqualTo(10), "tick advanced while frozen");
-            Assert.That(sim.Projectiles.Count, Is.EqualTo(1), "fired while frozen");
-            Assert.That(sim.Player.IsSwinging, Is.False, "swing started while frozen");
-            Assert.That(sim.Player.Position, Is.EqualTo(playerPos), "player moved while frozen");
+            var sim = WithFreeze(180);
+            var origin = sim.Fighters[0].Position;
+            RunUntil(sim, s => s.IsFrozen, in0: dash);
+            var mid = sim.Fighters[0].Position;
+            Assert.That(sim.Fighters[0].Action, Is.EqualTo(ActionKind.Dash), "freeze should land mid-dash");
+            Assert.That(mid.Z - origin.Z, Is.GreaterThan(0f).And.LessThan(t.DashSpeed * t.DashActive / 60f));
+
+            RunUntil(sim, s => !s.IsFrozen, in0: dash);
+            Assert.That(sim.Fighters[0].Position, Is.EqualTo(mid), "fighter moved during the freeze");
+            RunUntil(sim, s => s.Fighters[0].Action == ActionKind.None, in0: dash);
+
+            var reference = WithFreeze(0);
+            RunUntil(reference, s => s.CombatTick == sim.CombatTick, in0: dash);
+            Assert.That(sim.Fighters[0].Position, Is.EqualTo(reference.Fighters[0].Position), "not bit-exact with the unfrozen dash");
+            float distance = sim.Fighters[0].Position.Z - origin.Z;
+            Assert.That(distance, Is.EqualTo(t.DashSpeed * t.DashActive / 60f).Within(1e-4f), "dash distance");
         }
 
         [Test]
-        public void ClockDiscardsTimeWhileFrozen()
+        public void MeleeStartedBeforeFreezeLandsAfterResume()
         {
-            var clock = new TickClock();
-            for (int frame = 0; frame < 300; frame++)
-                Assert.That(clock.Advance(1.0 / 60.0, true), Is.Zero);
+            var t = new Tunables();
+            var swing = PressAt(Turn - t.MeleeStartup / 2, new InputFrame { Melee = true });
+            var sim = WithFreeze(180);
+            Place(sim, new Vec3(0, 0, 0), new Vec3(1.2f, 0, 0));
+            sim.Fighters[0].LockedOn = sim.Fighters[1].LockedOn = false;
 
-            Assert.That(clock.Advance(1.0 / 60.0, false), Is.EqualTo(1), "resume fast-forwarded");
-            Assert.That(clock.Advance(2.0, false), Is.EqualTo(Tunables.MaxTicksPerFrame), "hitch not capped");
+            RunUntil(sim, s => s.IsFrozen, in0: swing);
+            Assert.That(sim.Fighters[1].Hp, Is.EqualTo(t.MaxHp), "hit landed before the freeze");
+            RunUntil(sim, s => !s.IsFrozen, in0: swing);
+            Assert.That(sim.Fighters[1].Hp, Is.EqualTo(t.MaxHp), "hit landed during the freeze");
+            Run(sim, t.MeleeStartup + t.MeleeActive, in0: swing);
+            Assert.That(sim.Fighters[1].Hp, Is.EqualTo(t.MaxHp - t.MeleeDamage), "in-progress swing should finish and hit");
         }
 
         [Test]
-        public void ClockRunsOneTickPerFrameAt60Fps()
+        public void GameplayStateUntouchedDuringFreeze()
         {
-            // Regression: float TickDt (1f/60 rounds up) made 1/60 s frames yield 0 ticks.
-            var clock = new TickClock();
-            for (int frame = 0; frame < 600; frame++)
-                Assert.That(clock.Advance(1.0 / 60.0, false), Is.EqualTo(1), $"frame {frame}");
+            var sim = WithFreeze(180);
+            var b0 = new SimpleBot(sim, 0, 1);
+            var b1 = new SimpleBot(sim, 1, 2);
+            RunUntil(sim, s => s.IsFrozen, in0: b0, in1: b1);
+            var atFreeze = GameplayBytes(sim);
+            int combatTick = sim.CombatTick;
+            Run(sim, 179, b0, b1);
+            Assert.That(sim.IsFrozen, Is.True);
+            Assert.That(sim.CombatTick, Is.EqualTo(combatTick), "combat time advanced during the freeze");
+            Assert.That(GameplayBytes(sim), Is.EqualTo(atFreeze), "fighter or projectile state changed during the freeze");
         }
 
-        [Test]
-        public void SwingHoldsMidSwingAndFinishesOnTime()
+        /// <summary>Snapshot minus its fixed header (ticks, phase timer), which may move while frozen.</summary>
+        static byte[] GameplayBytes(Simulation sim)
         {
-            var sim = new Simulation();
-            var input = new ScriptedInput();
-            input.Set(0, new InputFrame { Melee = true });
-            Run(sim, input, 15);
-            float progress = sim.Player.SwingProgress;
-            Assert.That(sim.Player.IsSwinging && progress > 0f && progress < 1f, $"expected mid-swing, got {progress}");
-
-            sim.Freeze();
-            for (int i = 0; i < 200; i++) sim.Step(input.Read(sim.Tick));
-            Assert.That(sim.Player.SwingProgress, Is.EqualTo(progress), "swing progressed during freeze");
-            sim.Resume();
-
-            // The swing ends exactly SwingTotalTicks after it started, freeze or not.
-            Run(sim, input, Tunables.SwingTotalTicks - 15 - 1);
-            Assert.That(sim.Player.IsSwinging, Is.True, "swing ended a tick early");
-            Run(sim, input, 1);
-            Assert.That(sim.Player.IsSwinging, Is.False, "swing did not end on time");
+            var bytes = sim.SaveSnapshot();
+            const int header = 4 * 8; // version, tick, combatTick, turn, phase, phaseTicksLeft, winner, nextProjectileId
+            var tail = new byte[bytes.Length - header];
+            System.Array.Copy(bytes, header, tail, 0, tail.Length);
+            return tail;
         }
     }
 }

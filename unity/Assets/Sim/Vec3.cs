@@ -20,6 +20,12 @@ namespace Rats.Sim
             get { var len = Length; return len > 0f ? this / len : Zero; }
         }
 
+        /// <summary>Same vector on the floor plane (Y = 0).</summary>
+        public Vec3 Flat => new Vec3(X, 0f, Z);
+
+        public static float Dot(Vec3 a, Vec3 b) => a.X * b.X + a.Y * b.Y + a.Z * b.Z;
+        public static float DistanceXZ(Vec3 a, Vec3 b) => (a - b).Flat.Length;
+
         public static Vec3 operator +(Vec3 a, Vec3 b) => new Vec3(a.X + b.X, a.Y + b.Y, a.Z + b.Z);
         public static Vec3 operator -(Vec3 a, Vec3 b) => new Vec3(a.X - b.X, a.Y - b.Y, a.Z - b.Z);
         public static Vec3 operator *(Vec3 a, float s) => new Vec3(a.X * s, a.Y * s, a.Z * s);

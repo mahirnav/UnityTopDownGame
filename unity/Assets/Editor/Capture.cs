@@ -9,15 +9,13 @@ using UnityEngine;
 namespace Rats.EditorTools
 {
     /// <summary>
-    /// Scripted run that renders screenshots without play mode or a window, so the
-    /// freeze can be checked from the terminal:
+    /// Scripted run that renders screenshots without play mode or a window:
     ///   Unity.exe -batchmode -projectPath unity -executeMethod Rats.EditorTools.Capture.Run -captureDir &lt;dir&gt;
-    /// Walk, fire, swing, freeze mid-swing with the projectile in flight, hold, resume.
-    /// Exit code 0 = frozen frames were pixel-identical and the run finished.
+    /// Short turn: fighter 0 fires, fighter 1 dashes, the turn-end freeze catches both mid-action,
+    /// hold 120 frames, resume. Exit 0 = frozen frames pixel-identical and both actions caught mid-flight.
     /// </summary>
     public static class Capture
     {
-        const int FreezeTick = 40;
         const int HoldFrames = 120;
 
         public static void Run()
@@ -39,54 +37,38 @@ namespace Rats.EditorTools
             Directory.CreateDirectory(dir);
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             var bootstrap = new GameObject("Bootstrap").AddComponent<Bootstrap>();
-            bootstrap.Build();
+            var t = Tunables.Parse(File.ReadAllText(Path.Combine(Application.streamingAssetsPath, "tunables.txt")));
+            t.TurnTicks = 90;
+            bootstrap.Build(t);
 
-            var input = new ScriptedInput();
-            for (int t = 0; t < 20; t++) input.Set(t, new InputFrame { MoveX = 0.6f, MoveZ = 1f });
-            input.Set(20, new InputFrame { Fire = true });
-            input.Set(25, new InputFrame { Melee = true });
-            bootstrap.InputSource = input;
+            var p0 = new ScriptedInput();
+            p0.Set(60, new InputFrame { Ranged = true });
+            var p1 = new ScriptedInput();
+            p1.Set(80, new InputFrame { Dash = true, MoveX = -0.5f, MoveZ = 1f });
+            bootstrap.Inputs[0] = p0;
+            bootstrap.Inputs[1] = p1;
             var sim = bootstrap.Sim;
 
-            var animator = bootstrap.Character.GetComponentInChildren<Animator>();
-            var hand = animator != null ? animator.GetBoneTransform(HumanBodyBones.RightHand) : null;
-            var body = bootstrap.Character.transform;
-            var idleHand = hand != null ? body.InverseTransformPoint(hand.position) : Vector3.zero;
+            Shot(bootstrap, dir, "p0_start.png");
+            while (!sim.IsFrozen) StepAndSync(bootstrap);
+            bootstrap.SyncViews(0f, snapCamera: true); // settle the follow camera so only sim-driven visuals can differ
+            var start = Shot(bootstrap, dir, "p0_frozen_start.png");
+            bool caughtMidAction = sim.Projectiles.Count == 1 && sim.Fighters[1].Action == ActionKind.Dash;
 
-            while (sim.Tick < FreezeTick) StepAndSync(bootstrap);
-            sim.Freeze();
-            bootstrap.SyncViews(10f); // long delta settles the follow camera, so only sim-driven visuals can differ
-            var start = Shot(bootstrap, dir, "unity_frozen_start.png");
-
-            // Regression: an animation path that silently never posed the model still gave identical frames.
-            bool posed = true;
-            if (hand != null)
-            {
-                float moved = Vector3.Distance(body.InverseTransformPoint(hand.position), idleHand);
-                posed = moved > 0.1f;
-                Debug.Log($"[Capture] right hand moved {moved:F2} m from idle to frozen swing pose: {(posed ? "posed" : "NOT POSED")}");
-            }
-
-            var clock = new TickClock();
-            for (int frame = 0; frame < HoldFrames; frame++)
-            {
-                int ticks = clock.Advance(1.0 / 60.0, sim.IsFrozen);
-                for (int i = 0; i < ticks; i++) sim.Step(input.Read(sim.Tick));
-                bootstrap.SyncViews(1f / 60f);
-            }
-            var end = Shot(bootstrap, dir, "unity_frozen_end.png");
+            for (int frame = 0; frame < HoldFrames; frame++) StepAndSync(bootstrap);
+            var end = Shot(bootstrap, dir, "p0_frozen_end.png");
             bool identical = start.AsSpan().SequenceEqual(end);
-            Debug.Log($"[Capture] frozen frames pixel-identical: {identical}");
+            Debug.Log($"[Capture] caught mid-action: {caughtMidAction}, frozen frames pixel-identical: {identical}");
 
-            sim.Resume();
-            while (sim.Tick < FreezeTick + 60) StepAndSync(bootstrap);
-            Shot(bootstrap, dir, "unity_after_resume.png");
-            return identical && posed ? 0 : 2;
+            while (sim.IsFrozen) StepAndSync(bootstrap);
+            for (int i = 0; i < 30; i++) StepAndSync(bootstrap);
+            Shot(bootstrap, dir, "p0_after_resume.png");
+            return identical && caughtMidAction ? 0 : 2;
         }
 
         static void StepAndSync(Bootstrap b)
         {
-            b.Sim.Step(b.InputSource.Read(b.Sim.Tick));
+            b.Step();
             b.SyncViews(1f / 60f);
         }
 
@@ -112,8 +94,8 @@ namespace Rats.EditorTools
 
             var sim = b.Sim;
             var proj = sim.Projectiles.Count > 0 ? sim.Projectiles[0].Position.ToString() : "-";
-            Debug.Log($"[Capture] {path}  tick={sim.Tick}  frozen={sim.IsFrozen}  " +
-                      $"swing={sim.Player.SwingProgress:F3}  projectile={proj}  humanoid={b.Character.HasHumanoid}");
+            Debug.Log($"[Capture] {path}  tick={sim.Tick}  combat={sim.CombatTick}  phase={sim.Phase}  " +
+                      $"f1={sim.Fighters[1].Action}:{sim.Fighters[1].ActionTick}  projectile={proj}");
             return png;
         }
 

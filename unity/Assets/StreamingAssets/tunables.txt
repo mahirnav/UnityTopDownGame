@@ -1,0 +1,47 @@
+# RATS tunables. Edit, save, then press F5 in play mode (reloads and restarts the round).
+# 60 ticks = 1 second. Distances in meters, speeds in meters/second.
+
+# --- Turn structure ---
+TurnTicks = 480             # combat time per turn (8 s)
+FreezeTicks = 180           # frozen pause between turns (3 s)
+ActionPointsPerTurn = 3
+
+# --- Fighters ---
+MaxHp = 100
+FighterRadius = 0.4
+MoveSpeed = 5               # walking; fighters are rooted while an action plays
+
+# --- Melee ---
+MeleeCost = 1
+MeleeStartup = 10
+MeleeActive = 6
+MeleeRecovery = 20
+MeleeDamage = 20
+MeleeRange = 1.6            # reach from the fighter's center
+MeleeArcDegrees = 120       # total arc in front
+
+# --- Dash ---
+DashCost = 1
+DashStartup = 3
+DashActive = 12
+DashRecovery = 8
+DashSpeed = 18              # 18 m/s x 12 ticks = 3.6 m per dash
+
+# --- Ranged ---
+RangedCost = 1
+RangedStartup = 12
+RangedActive = 1            # projectile spawns on the first active tick
+RangedRecovery = 18
+RangedDamage = 10
+ProjectileSpeed = 14
+ProjectileRadius = 0.15
+ProjectileLifetimeTicks = 180
+ProjectileSpawnHeight = 1
+
+# --- Arena (oval pit) ---
+ArenaRadiusX = 14
+ArenaRadiusZ = 10
+PillarRadius = 0.9
+PillarOffsetX = 5.5         # 4 pillars at (+-X, +-Z)
+PillarOffsetZ = 4
+StartOffsetX = 9            # fighters start at (-X, 0) and (+X, 0)

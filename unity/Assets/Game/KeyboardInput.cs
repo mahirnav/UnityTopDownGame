@@ -4,37 +4,43 @@ using UnityEngine;
 namespace Rats.Game
 {
     /// <summary>
-    /// Player 1 keyboard: WASD move, Space fire, E melee.
-    /// Presses are latched until a sim tick reads them, so a press is never lost
-    /// on a render frame that runs zero ticks.
+    /// Keyboard input source: WASD move (camera-relative), J melee, K ranged, Space dash, Tab lock-on.
+    /// Converts camera-relative movement to world space here, so the sim only ever sees world input.
+    /// Presses are latched until a sim tick reads them, so a press is never lost on a zero-tick frame.
     /// </summary>
     public sealed class KeyboardInput : IInputSource
     {
-        bool firePressed, meleePressed;
+        readonly Transform camera;
+        bool melee, ranged, dash, toggleLock;
+
+        public KeyboardInput(Transform camera) { this.camera = camera; }
 
         /// <summary>Call once per render frame, before stepping the sim.</summary>
         public void Poll()
         {
-            if (UnityEngine.Input.GetKeyDown(KeyCode.Space)) firePressed = true;
-            if (UnityEngine.Input.GetKeyDown(KeyCode.E)) meleePressed = true;
+            if (Input.GetKeyDown(KeyCode.J)) melee = true;
+            if (Input.GetKeyDown(KeyCode.K)) ranged = true;
+            if (Input.GetKeyDown(KeyCode.Space)) dash = true;
+            if (Input.GetKeyDown(KeyCode.Tab)) toggleLock = true;
         }
-
-        public void ClearPresses() { firePressed = false; meleePressed = false; }
 
         public InputFrame Read(int tick)
         {
+            float right = Axis(KeyCode.D, KeyCode.A), forward = Axis(KeyCode.W, KeyCode.S);
+            var camForward = Vector3.ProjectOnPlane(camera.forward, Vector3.up).normalized;
+            var camRight = Vector3.Cross(Vector3.up, camForward);
+            var move = Vector3.ClampMagnitude(camForward * forward + camRight * right, 1f);
+
             var frame = new InputFrame
             {
-                MoveX = Axis(KeyCode.D, KeyCode.A),
-                MoveZ = Axis(KeyCode.W, KeyCode.S),
-                Fire = firePressed,
-                Melee = meleePressed,
+                MoveX = move.x, MoveZ = move.z,
+                Melee = melee, Ranged = ranged, Dash = dash, ToggleLock = toggleLock,
             };
-            ClearPresses();
+            melee = ranged = dash = toggleLock = false;
             return frame;
         }
 
         static float Axis(KeyCode positive, KeyCode negative) =>
-            (UnityEngine.Input.GetKey(positive) ? 1f : 0f) - (UnityEngine.Input.GetKey(negative) ? 1f : 0f);
+            (Input.GetKey(positive) ? 1f : 0f) - (Input.GetKey(negative) ? 1f : 0f);
     }
 }
