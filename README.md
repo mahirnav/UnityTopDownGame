@@ -14,6 +14,22 @@ See CLAUDE.md for the architecture rules.
 - `unity/SimTests/`: NUnit tests for the sim, run with `dotnet test` (Unity not needed).
 - `scripts/test.ps1`: runs everything from the terminal.
 
+## Getting started (new machine)
+
+1. Install **Unity Hub**, then the exact editor **6000.3.26f1** (other versions will upgrade the project files).
+2. Install **Git** and **Git LFS** (`git lfs install` once). Optional for tests: the **.NET 8 SDK**.
+3. Clone, then run the one-time setup (LFS hooks + Unity SmartMerge for scene files):
+   ```
+   git clone https://github.com/mahirnav/UnityTopDownGame.git
+   cd UnityTopDownGame
+   .\scripts\setup-git.ps1
+   ```
+4. In Unity Hub: **Add → Add project from disk** → pick the `unity` folder.
+
+Working together: branch per feature (`git switch -c feature/xyz`), keep `main` playable, run
+`.\scripts\test.ps1` before pushing. Scenes are generated from code, so avoid hand-editing them.
+Read `CLAUDE.md` for the architecture rules (also what Claude Code follows).
+
 ## Run it
 
 Open `unity/` in Unity Hub (6000.3.26f1). The Bootstrap scene opens automatically. Press Play.
