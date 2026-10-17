@@ -1,0 +1,24 @@
+using Rats.Sim;
+using UnityEngine;
+
+namespace Rats.Game
+{
+    static class Primitives
+    {
+        /// <summary>Unity primitive with its collider removed: gameplay never uses engine physics.</summary>
+        public static GameObject Create(PrimitiveType type, Transform parent, Color color)
+        {
+            var go = GameObject.CreatePrimitive(type);
+            Object.DestroyImmediate(go.GetComponent<Collider>());
+            go.transform.SetParent(parent, false);
+            var renderer = go.GetComponent<Renderer>();
+            renderer.sharedMaterial = new Material(renderer.sharedMaterial) { color = color };
+            return go;
+        }
+    }
+
+    static class SimConvert
+    {
+        public static Vector3 ToUnity(Vec3 v) => new Vector3(v.X, v.Y, v.Z);
+    }
+}

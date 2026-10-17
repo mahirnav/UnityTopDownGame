@@ -1,0 +1,26 @@
+# Unity
+unity/[Ll]ibrary/
+unity/[Tt]emp/
+unity/[Oo]bj/
+unity/[Bb]uild/
+unity/[Bb]uilds/
+unity/[Ll]ogs/
+unity/[Uu]ser[Ss]ettings/
+unity/*.csproj
+unity/*.sln
+unity/*.slnx
+unity/.vs/
+unity/.vscode/
+
+# Unity-free sim tests (dotnet)
+bin/
+obj/
+TestResults/
+
+# Captures written by headless screenshot runs
+captures/
+
+# OS / editors
+Thumbs.db
+.DS_Store
+.idea/
