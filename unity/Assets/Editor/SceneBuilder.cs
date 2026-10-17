@@ -23,8 +23,11 @@ namespace Rats.EditorTools
             {
                 if (EditorApplication.isPlayingOrWillChangePlaymode) return;
                 if (!string.IsNullOrEmpty(SceneManager.GetActiveScene().path)) return;
-                if (AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath) == null) Build();
-                EditorSceneManager.OpenScene(ScenePath);
+                // Only open, never regenerate: rebuilding writes new object IDs into the scene file,
+                // which would cause merge conflicts every time someone opens the editor.
+                // (The asset database can report the scene missing this early, so check the disk.)
+                if (System.IO.File.Exists(ScenePath)) EditorSceneManager.OpenScene(ScenePath);
+                else Debug.LogWarning($"[SceneBuilder] {ScenePath} missing; use RATS > Rebuild Bootstrap Scene.");
             };
         }
 
