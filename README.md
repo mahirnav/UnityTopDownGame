@@ -1,6 +1,6 @@
 # RATS
 
-1v1 third-person gladiator arena. Unity 6.3 LTS (6000.3.26f1), C#.
+Multiplayer PvP third-person game (repo: UnityThirdPersonGame). 1v1 gladiator arena. Unity 6.3 LTS (6000.3.26f1), C#.
 
 Current state: **P0 core turn loop.** You (red) against a simple bot (blue) in an oval pit with 4 pillars.
 8 s turns with 3 action points, then a 3 s freeze that stops everything mid-action. HP, round end, lock-on.
