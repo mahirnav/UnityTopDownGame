@@ -7,7 +7,7 @@ Core question for the prototype: does 3 actions per short turn + freeze make fun
 Engine: **Unity 6000.3.26f1** (exact version; anyone opening the project must use it). Godot is not used.
 
 ## How we work
-- Nick designs and playtests; Claude writes the code and the tests. A friend may join (role TBD).
+- Nick designs and playtests; Claude writes the code and the tests. Nick's friend (mahirnav, owns the GitHub repo) collaborates.
 - Challenge weak ideas and explain trade-offs. **Never change a game design rule without Nick's approval.**
   When a rule isn't specified, pick the simplest default, make it a tunable if cheap, and list it as "my default, your call".
 - Keep it small: no frameworks, no speculative abstraction, no unrelated refactors.
@@ -34,6 +34,14 @@ Engine: **Unity 6000.3.26f1** (exact version; anyone opening the project must us
 Multiplayer-readiness tests that must stay green: **snapshot round-trip** (save → load → both sims stay identical)
 and **replay** (recorded inputs → bit-identical end state). If you add sim state, add it to the snapshot.
 
+## Networking (current)
+- `Sim/Net/`: plain C# TCP, polled from the game loop (no threads). Host runs the only sim and sends a snapshot
+  every tick; the client sends one `InputFrame` per tick and applies snapshots. No client prediction yet.
+- Connection setup (host on port 7777 / join by address, used with Tailscale) is separate from the protocol so
+  matchmaking can replace it later. Bump `NetProtocol.Version` when messages or snapshots change.
+- `NetTests` run real localhost TCP; keep them green. Builds need `PlayerBuild.IncludeCodeOnlyShaders`
+  (code-built scenes reference no shaders, so builds would strip Standard and fog).
+
 ## Layout
 - `unity/Assets/Sim/`: simulation, tunables parser, bot. No UnityEngine.
 - `unity/Assets/Game/`: MonoBehaviours, views, keyboard input, camera. Only reads sim state.
@@ -56,4 +64,4 @@ Screenshots/logs go to `captures/` (git-ignored). Look at the screenshots after 
 - Sim code must compile as C# 9 (no newer syntax); `dotnet test` enforces this.
 
 ## Roadmap
-P0 core turn loop (current) → P1 mirrored drafting (~8 upgrades) → P2 downed/execute/fire ring → P3 two humans, hidden drafts, networking.
+P0 core turn loop (done, playtested) → networked 1v1 over Tailscale (current; pulled forward from P3) → P1 mirrored drafting (~8 upgrades) → P2 downed/execute/fire ring → P3 hidden drafts, matchmaking.

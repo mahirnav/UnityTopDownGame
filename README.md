@@ -38,6 +38,18 @@ Keys: WASD move · J melee · K ranged · Space dash · Tab lock-on · Q/E orbit
 
 Tune numbers in `unity/Assets/StreamingAssets/tunables.txt`, save, press F5.
 
+## Play online (1v1)
+
+Host-authoritative: the host's machine runs the match; the other player sends inputs and sees the host's state.
+
+1. Both install [Tailscale](https://tailscale.com/download) and sign in to the same tailnet (the host shares/invites the other).
+2. Host: press **Esc** → **Host a game**. The menu lists your addresses; send the other player the **Tailscale** one (`100.x.y.z`).
+   Windows Firewall asks once: allow it.
+3. Other player: **Esc** → type the address → **Join**. The round starts for both. The host controls Enter/F5 restarts and tunables.
+
+Built player shortcuts: `.\scripts\build.ps1` makes `unity/Builds/RATS/RATS.exe`; run `RATS.exe -host` or `RATS.exe -join 100.x.y.z`.
+Both sides need the same code version (the game refuses mismatched versions). Port 7777.
+
 ## Tests
 
 ```
