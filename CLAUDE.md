@@ -69,5 +69,9 @@ Screenshots/logs go to `captures/` (git-ignored). Look at the screenshots after 
 - PlayableGraph manual Evaluate doesn't pose models outside play mode; use `AnimationClip.SampleAnimation`.
 - Sim code must compile as C# 9 (no newer syntax); `dotnet test` enforces this.
 
+## Design direction
+Read `docs/design-direction.md` before design work: what's **approved**, what's only a **leaning**, and what's open.
+Treat leanings as direction to discuss, not rules. `docs/upgrades.md` has the P1 pool and the full candidate list.
+
 ## Roadmap
 P0 core turn loop (done, playtested) → networked 1v1 over Tailscale (current; pulled forward from P3) → P1 mirrored drafting (~8 upgrades) → P2 downed/execute/fire ring → P3 hidden drafts, matchmaking.
