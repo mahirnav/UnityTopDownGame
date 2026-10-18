@@ -182,18 +182,6 @@ namespace Rats.SimTests
         }
 
         [Test]
-        public void KnockoutEndsRoundAndFreezesEverything()
-        {
-            var sim = Create();
-            sim.Fighters[1].Hp = sim.T.RangedDamage;
-            RunUntil(sim, s => s.Phase == Phase.RoundOver, 600, PressAt(0, new InputFrame { Ranged = true }));
-            Assert.That(sim.Winner, Is.EqualTo(0));
-            int tick = sim.Tick;
-            Run(sim, 60, HoldFrom(0, 100000, new InputFrame { Dash = true }));
-            Assert.That(sim.Tick, Is.EqualTo(tick), "sim should not advance after the round ends");
-        }
-
-        [Test]
         public void SimultaneousKnockoutIsADraw()
         {
             var sim = Create();

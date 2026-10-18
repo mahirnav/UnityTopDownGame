@@ -37,6 +37,7 @@ namespace Rats.Game
         readonly Dictionary<int, GameObject> projectileViews = new Dictionary<int, GameObject>();
         readonly HashSet<int> seen = new HashSet<int>();
         readonly CharacterView[] fighters = new CharacterView[2];
+        Feedback feedback;
         KeyboardInput keyboard;
         CameraRig cameraRig;
         Transform world;
@@ -108,6 +109,7 @@ namespace Rats.Game
             cam.backgroundColor = SkyColor;
             cam.fieldOfView = 55f;
             cameraRig = new CameraRig(cam);
+            feedback = new Feedback(cameraRig, fighters);
 
             keyboard = new KeyboardInput(cam.transform);
             Inputs[localIndex] = keyboard;
@@ -151,7 +153,7 @@ namespace Rats.Game
             int ticks = clock.Advance(Time.unscaledDeltaTime);
             for (int i = 0; i < ticks; i++) Step();
             if (ticks > 0) host?.SendSnapshot(Sim.SaveSnapshot());
-            if (Sim.Phase == Phase.RoundOver && recording != null) { SaveRecording("round"); recording = null; }
+            if (Sim.Phase == Phase.MatchOver && recording != null) { SaveRecording("match"); recording = null; }
             if (!menuOpen && Input.GetKeyDown(KeyCode.F9)) SaveRecording("marked");
         }
 
@@ -327,6 +329,7 @@ namespace Rats.Game
             foreach (var id in projectileViews.Keys) if (!seen.Contains(id)) gone.Add(id);
             foreach (var id in gone) { DestroyImmediate(projectileViews[id]); projectileViews.Remove(id); }
 
+            feedback.Sync(Sim, localIndex);
             cameraRig.Update(Sim.Fighters[localIndex], Sim.Fighters[1 - localIndex], deltaTime, snapCamera);
             for (int i = 0; i < 2; i++) fighters[i].Sync(Sim.Fighters[i], Sim.T, Camera.transform.rotation);
         }
@@ -395,7 +398,7 @@ namespace Rats.Game
             string themName = Online ? "Opponent" : "Bot";
             string phase = Sim.Phase == Phase.Combat ? $"COMBAT  {Sim.PhaseTicksLeft / 60f:F1}s"
                          : Sim.Phase == Phase.Freeze ? $"FROZEN  {Sim.PhaseTicksLeft / 60f:F1}s"
-                         : "ROUND OVER";
+                         : Sim.Phase == Phase.RoundOver ? "ROUND OVER" : "MATCH OVER";
             string restartKeys = isClient ? "" : "  Enter restart  F5 reload tunables  F9 save replay";
             GUI.Label(new Rect(12, 8, 900, 140),
                 $"Turn {Sim.Turn}   {phase}\n" +
@@ -409,19 +412,35 @@ namespace Rats.Game
             if (tunablesError != null) GUI.Label(new Rect(12, 150, 900, 40), tunablesError);
             if (replayMessage != null && Time.unscaledTime < replayMessageUntil) GUI.Label(new Rect(12, 170, 900, 40), replayMessage);
 
-            if (Sim.Phase == Phase.RoundOver)
-            {
-                string result = Sim.Winner == Simulation.Draw ? "DRAW"
-                              : Sim.Winner == localIndex ? "YOU WIN"
-                              : Online ? "OPPONENT WINS" : "BOT WINS";
-                var style = new GUIStyle(GUI.skin.label) { fontSize = 40, alignment = TextAnchor.MiddleCenter };
-                GUI.Label(new Rect(0, Screen.height * 0.35f, Screen.width, 60), result, style);
-                GUI.Label(new Rect(0, Screen.height * 0.35f + 60, Screen.width, 30), isClient ? "Waiting for the host to restart" : "Enter to restart",
-                    new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter });
-            }
+            feedback.Draw(Sim, Camera);
+            DrawMatchStatus(themName);
 
             if (Sim.DraftActive && Sim.Phase == Phase.Freeze) DrawDraft(me, them);
             if (menuOpen) DrawMenu();
+        }
+
+        /// <summary>Round and score at the top, plus round/match result banners.</summary>
+        void DrawMatchStatus(string themName)
+        {
+            var top = new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            GUI.Label(new Rect(0, 4, Screen.width, 30), $"ROUND {Sim.Round}     You {Sim.Score(localIndex)} - {Sim.Score(1 - localIndex)} {themName}", top);
+
+            if (Sim.Phase != Phase.RoundOver && Sim.Phase != Phase.MatchOver) return;
+            var big = new GUIStyle(GUI.skin.label) { fontSize = 44, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            var small = new GUIStyle(GUI.skin.label) { fontSize = 18, alignment = TextAnchor.MiddleCenter };
+            string theirs = Online ? "OPPONENT" : "BOT";
+            if (Sim.Phase == Phase.RoundOver)
+            {
+                string result = Sim.Winner == Simulation.Draw ? "DRAW - ROUND REPLAYED" : Sim.Winner == localIndex ? "ROUND TO YOU" : $"ROUND TO {theirs}";
+                GUI.Label(new Rect(0, Screen.height * 0.33f, Screen.width, 60), result, big);
+                GUI.Label(new Rect(0, Screen.height * 0.33f + 58, Screen.width, 30), $"Next round in {Sim.PhaseTicksLeft / 60f:F1}s", small);
+            }
+            else
+            {
+                string result = Sim.MatchWinner == localIndex ? "YOU WIN THE MATCH" : $"{theirs} WINS THE MATCH";
+                GUI.Label(new Rect(0, Screen.height * 0.33f, Screen.width, 60), $"{result}  {Sim.Score(localIndex)}-{Sim.Score(1 - localIndex)}", big);
+                GUI.Label(new Rect(0, Screen.height * 0.33f + 58, Screen.width, 30), isClient ? "Waiting for the host to start a new match" : "Enter for a new match", small);
+            }
         }
 
         string NetStatusLine()

@@ -27,6 +27,16 @@ namespace Rats.Sim
         public double StartupWalkMultiplier = 0; // walk speed fraction during melee/ranged startup (0 = rooted)
         public double BackpedalMultiplier = 0.6; // speed moving straight back from where you face (sideways = full)
 
+        // Facing and backstabs
+        public double IdleTurnRateDeg = 720;    // deg/s turning toward your target or run direction (0 = instant)
+        public double StartupTurnRateDeg = 180; // deg/s tracking a locked target during attack startup (0 = none)
+        public double BackstabArcDegrees = 90;  // rear cone (total width) where melee counts as a backstab
+        public int BackstabPercent = 50;        // bonus melee damage from behind (0 = off)
+
+        // Rounds
+        public int RoundsToWin = 3;            // best of 5
+        public int RoundBreakTicks = 180;      // pause between rounds
+
         // Lock-on
         public int LockOnGraceTicks = 0;       // ticks of lost sight before lock breaks (0 = immediately)
         public int AutoRelockTicks = 0;        // after a break, lock returns if the target reappears within this (0 = off)

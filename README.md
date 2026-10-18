@@ -2,8 +2,9 @@
 
 Multiplayer PvP third-person game (repo: UnityThirdPersonGame). 1v1 gladiator arena. Unity 6.3 LTS (6000.3.26f1), C#.
 
-Current state: **P0 core turn loop.** You (red) against a simple bot (blue) in an oval pit with 4 pillars.
-8 s turns with 3 action points, then a 3 s freeze that stops everything mid-action. HP, round end, lock-on.
+Current state: **early prototype.** You (red) against a bot or a friend (blue) in an oval pit with 4 pillars.
+Best-of-5 matches; 8 s turns with 3 action points; time freezes mid-action between turns; upgrade drafts on the
+first 3 freezes of each round; backstabs, lock-on, online play over Tailscale.
 See CLAUDE.md for the architecture rules.
 
 ## Layout

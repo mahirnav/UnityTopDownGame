@@ -24,6 +24,10 @@ namespace Rats.Game
         Color baseColor;
         int lastHp = int.MaxValue;
         float flashUntil;
+        float flinchUntil;
+
+        /// <summary>Brief recoil when hit (visual only).</summary>
+        public void Flinch() => flinchUntil = Time.unscaledTime + 0.15f;
 
         public void Build(Color color, int pipCount)
         {
@@ -68,6 +72,7 @@ namespace Rats.Game
                      : fighter.Action == ActionKind.Melee ? Mathf.Sin(progress * Mathf.PI) * 35f
                      : 0f;
             }
+            if (Time.unscaledTime < flinchUntil) lean -= 18f;
             body.localRotation *= Quaternion.Euler(lean, 0f, 0f);
 
             if (fighter.Hp < lastHp && lastHp != int.MaxValue) flashUntil = Time.unscaledTime + HitFlashSeconds;

@@ -3,12 +3,14 @@ using System;
 namespace Rats.Sim
 {
     /// <summary>
-    /// Placeholder opponent so Nick can play alone. Just another input source: it reads the
-    /// sim like a player looks at the screen and returns presses. Seeded so runs repeat.
-    /// Approach from far, circle otherwise; melee up close, shoot at mid range.
+    /// Placeholder opponent so Nick can play alone. Just another input source: it reads the sim like a
+    /// player looks at the screen and returns presses. Seeded so runs repeat.
+    /// Approaches from far and circles otherwise (backpedaling is slow). Dodges swings it sees coming,
+    /// keeps its last action point to punish, and loves a backstab.
     /// </summary>
     public sealed class SimpleBot : IInputSource
     {
+        const int ReserveSpendTicksLeft = 60;  // spend the reserved point anyway in the last second of a turn
         readonly Simulation sim;
         readonly int index;
         readonly Random rng;
@@ -31,7 +33,7 @@ namespace Rats.Sim
             var me = sim.Fighters[index];
             if (sim.DraftActive && me.DraftPick == 0)
             {
-                // Think for a moment, then take a random offer it doesn't own yet.
+                // Think for a moment, then take a random offer.
                 if (draftDecideTick < 0) draftDecideTick = tick + rng.Next(20, 120);
                 if (tick >= draftDecideTick)
                 {
@@ -52,6 +54,7 @@ namespace Rats.Sim
             double dist = to.Length;
             var dir = dist > 1e-4 ? to / dist : Vec3.Zero;
             bool lineOfSight = sim.Arena.LineOfSight(me.Position, them.Position);
+            double reach = sim.T.MeleeRange + sim.T.FighterRadius;
 
             if (!me.LockedOn && lineOfSight) frame.ToggleLock = true;
 
@@ -61,17 +64,32 @@ namespace Rats.Sim
                 nextStrafeFlip = tick + rng.Next(40, 120);
             }
             var side = new Vec3(-dir.Z, 0, dir.X) * strafeSign;
-            var move = dist > 7 ? dir : side; // circle rather than backpedal (backpedaling is slow)
+            var move = dist > 7 ? dir : side; // circle rather than backpedal
             frame.MoveX = (float)move.X;
             frame.MoveZ = (float)move.Z;
+            if (me.IsBusy || me.ActionPoints == 0) return frame;
 
-            if (!me.IsBusy && me.ActionPoints > 0 && tick >= nextActionTick)
+            // Dodge a swing that's winding up in range: dash sideways, usually.
+            bool swingIncoming = them.Action == ActionKind.Melee && them.ActionTick < them.Frames.Startup && dist < reach + 1;
+            if (swingIncoming && rng.Next(100) < 65)
             {
-                if (dist < sim.T.MeleeRange + sim.T.FighterRadius) frame.Melee = true;
-                else if (dist < 10 && lineOfSight) frame.Ranged = true;
-                else if (dist >= 10) frame.Dash = true;
-                if (frame.Melee || frame.Ranged || frame.Dash) nextActionTick = tick + rng.Next(25, 110);
+                frame.Dash = true;
+                frame.MoveX = (float)side.X;
+                frame.MoveZ = (float)side.Z;
+                return frame;
             }
+            if (tick < nextActionTick) return frame;
+
+            // Keep the last point for a punish unless the opening is there or the turn is ending.
+            bool opening = them.ActionPoints == 0 || (them.IsBusy && them.ActionTick >= them.Frames.Startup + them.Frames.Active);
+            bool lastPoint = me.ActionPoints == 1 && !me.Has(UpgradeId.CarryTheFlame);
+            if (lastPoint && !opening && sim.PhaseTicksLeft > ReserveSpendTicksLeft) return frame;
+
+            if (dist < reach) frame.Melee = true;                       // includes backstabs when behind
+            else if (dist < 10 && lineOfSight) frame.Ranged = true;
+            else if (dist >= 10) frame.Dash = true;
+            if (frame.Melee || frame.Ranged || frame.Dash) nextActionTick = tick + rng.Next(20, 90);
+            if (frame.Dash) { frame.MoveX = (float)dir.X; frame.MoveZ = (float)dir.Z; }
             return frame;
         }
     }

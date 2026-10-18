@@ -9,7 +9,9 @@ namespace Rats.SimTests
 
         public static Simulation Create(System.Action<Tunables> tweak = null, ulong seed = 1)
         {
-            var t = new Tunables { DraftsPerRound = 0 }; // drafting off unless a test turns it on
+            // Legacy scenario defaults: no drafting, instant turning, no startup tracking, no backstabs.
+            // Tests that cover those features turn them on.
+            var t = new Tunables { DraftsPerRound = 0, IdleTurnRateDeg = 0, StartupTurnRateDeg = 0, BackstabPercent = 0 };
             tweak?.Invoke(t);
             return new Simulation(t, seed);
         }

@@ -14,6 +14,12 @@ namespace Rats.Game
 
         public readonly Camera Camera;
         float yaw;
+        float shake;
+        Vector3 smoothPosition;
+        bool hasPosition;
+
+        /// <summary>Kick the camera; decays over a fraction of a second (visual only).</summary>
+        public void AddShake(float amount) => shake = Mathf.Max(shake, amount);
 
         public CameraRig(Camera camera) { Camera = camera; }
 
@@ -41,8 +47,11 @@ namespace Rats.Game
 
             var t = Camera.transform;
             float blend = snap ? 1f : 1f - Mathf.Exp(-FollowRate * deltaTime);
-            t.position = Vector3.Lerp(t.position, desired, blend);
-            var look = Quaternion.LookRotation(lookAt - t.position, Vector3.up);
+            if (!hasPosition) { smoothPosition = t.position; hasPosition = true; }
+            smoothPosition = Vector3.Lerp(smoothPosition, desired, blend);
+            shake = Mathf.Max(0f, shake - deltaTime * 1.2f);
+            t.position = smoothPosition + (shake > 0f ? Random.insideUnitSphere * shake : Vector3.zero);
+            var look = Quaternion.LookRotation(lookAt - smoothPosition, Vector3.up);
             t.rotation = snap ? look : Quaternion.Slerp(t.rotation, look, blend);
         }
     }

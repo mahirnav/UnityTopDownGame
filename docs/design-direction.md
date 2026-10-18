@@ -12,7 +12,11 @@ Where the game is heading, from Nick's design discussions. Three levels, and the
   Carry the Flame. Overclock was cut. Details in `docs/upgrades.md`.
 - **P1 is built:** drafting on the **first 3 freezes in a row** (5 s each), **each player gets their own 3 random offers, never something they already own** (the RNG difference can enable comebacks), keys 1-3, picks apply when the freeze ends, no pick = your first offer. Current upgrades are placeholders for balance and fit.
 - **Backpedaling is slower:** moving straight back from where you face is 60% speed (sideways full), so retreating can't outrun melee and circling is the way to evade. Unlocked, you face where you run (no penalty, but no lock-on). Damage is read when a hit lands, so frozen attacks get upgrades picked during the freeze.
-- **Facing:** an action's direction stays where it started (for now; see the facing model under Leaning).
+- **Best-of-5 matches:** first to 3 round wins; 3 s break between rounds; upgrades, HP and drafts reset each round; a draw scores nobody and the round is replayed.
+- **Facing model (built, tunable):** idle turning 720°/s (not instant), limited tracking of a locked target during attack startup (180°/s), direction locked for active/recovery and when a bolt is released. 0 restores the old instant / stays-where-started behavior.
+- **Backstabs (built, tunable):** melee from the target's 90° rear cone deals +50%, read when the hit lands. Possible because turning is no longer instant.
+- **Hit feedback and turn-end cue (built, visual only):** damage pop-ups (BACKSTAB!), flinch, camera shake, a 1 s icy tint + shrinking bar + 3 blips before each freeze, "FROZEN" flash and tone.
+- **Bot:** circles, dodges swings it sees coming, keeps its last point to punish, takes backstabs.
 - **Startup walking and lock-on grace** exist as tunables, default off, to A/B in playtests.
 - **Online:** host-authoritative direct connection over Tailscale now; real matchmaking later.
 
@@ -57,11 +61,10 @@ Where the game is heading, from Nick's design discussions. Three levels, and the
   not enough (slow-mo would extend real time at the boundary and feed action dumping).
 
 ## Under evaluation (theory only, not approved)
-- **Limited-rotation melee tracking** during startup, direction locked on release.
 - **Hold-to-charge melee** on the same button: tap = fast/light, hold = stronger up to a cap, 1 point at start.
   Main risk: banking a charge across the freeze (fresh points plus a charged swing).
-- **Deterministic backstabs**: rear-cone damage multiplier read at hit; works best with the facing model.
-- All three buff melee; expect to retune ranged afterwards.
+- Tracking and backstabs are now built (see Approved); charging would complete the melee set. Melee got several buffs;
+  expect to retune ranged afterwards.
 
 ## Open questions
 - Do upgrades or augments carry across rounds (full, one chosen, none)?

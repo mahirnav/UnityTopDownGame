@@ -13,6 +13,16 @@ MoveSpeed = 5               # walking
 StartupWalkMultiplier = 0   # walk speed during melee/ranged startup: 0 = rooted (current), try 0.5
 BackpedalMultiplier = 0.6   # speed when moving straight back from where you face; sideways = full speed
 
+# --- Facing and backstabs ---
+IdleTurnRateDeg = 720       # how fast you turn toward your target / run direction (0 = instant, old behavior)
+StartupTurnRateDeg = 180    # tracking a locked target during attack startup (0 = attack faces where it started)
+BackstabArcDegrees = 90     # rear cone where melee counts as a backstab
+BackstabPercent = 50        # bonus melee damage from behind (0 = off)
+
+# --- Rounds ---
+RoundsToWin = 3             # first to 3 round wins takes the match (best of 5)
+RoundBreakTicks = 180       # 3 s pause between rounds
+
 # --- Lock-on ---
 LockOnGraceTicks = 0        # ticks of lost sight before lock breaks: 0 = instant (current), try 6-9
 AutoRelockTicks = 0         # lock returns by itself if the target reappears within this: 0 = off, try 30
