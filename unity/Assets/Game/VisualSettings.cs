@@ -12,10 +12,11 @@ namespace Rats.Game
     /// </summary>
     public sealed class VisualSettings
     {
-        // PS2-style rendering
-        public int PixelHeight = 360;          // render height in pixels before upscaling (0 = full resolution)
-        public int ColorLevels = 24;           // color steps per channel (0 = no banding)
-        public float Dither = 0.6f;            // ordered dither strength (0 = none)
+        // Rendering (defaults lean classic WoW; the PS2 values are in the comments)
+        public int PixelHeight = 0;            // render height in pixels before upscaling (0 = full resolution; 360 = PS2 look)
+        public int ColorLevels = 0;            // color steps per channel (0 = no banding; 24 = PS2 look)
+        public float Dither = 0f;              // ordered dither strength (0 = none; 0.6 = PS2 look)
+        public bool SmoothTextures = true;     // smooth hand-painted WoW feel (false = crisp point-sampled pixels)
         public float FreezeDesaturate = 0.55f; // how gray/icy the world goes during a freeze (0 = off)
         public float TintR = 1.06f, TintG = 0.94f, TintB = 0.86f; // warm sunset grade (1,1,1 = neutral)
         public float Saturation = 1.12f;       // 1 = unchanged

@@ -22,6 +22,9 @@ Where the game is heading, from Nick's design discussions. Three levels, and the
   (no point cost) and always complete once started. A **fire ring** starts closing at 30 s and fully closes at **90 s**
   (combat time); fire damage **ramps** the longer you stand in it and can down you. At the cap, higher HP% wins.
   Optional `FinalStageTurnTicks` shortens turns once the ring closes (off by default). The bot avoids fire and executes.
+- **Look: classic WoW over PS2 (Nick, 2026-10-18):** full resolution, smooth hand-painted textures, no pixelation or
+  banding by default; the PS2 knobs stay in visuals.txt. Character models: stylized low-poly (e.g. Synty POLYGON, Quaternius)
+  with Mixamo/Asset Store melee animations; Nick sends candidates before buying. No ripped WoW assets.
 - **Scale and pace (Nick's playtest, 2026-10-18):** arena enlarged to WoW-arena scale, **48 x 34 m** (pillars and start
   positions scaled; fighters start 30 m apart); **turns 13 s** (was 8). Movement stays 5 m/s (already below WoW's ~6.4 m/s);
   the fast feel was the small arena and close camera, so the camera moved back (`CameraDistance` in visuals.txt).

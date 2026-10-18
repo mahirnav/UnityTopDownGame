@@ -8,6 +8,9 @@ namespace Rats.Game
     /// </summary>
     static class ProcTex
     {
+        /// <summary>Smooth (trilinear) filtering for the hand-painted WoW feel; false = crisp point sampling. Set before building.</summary>
+        public static bool Smooth = true;
+
         public static Texture2D Sand(Color light, Color dark, int seed, int size = 128)
         {
             var tex = New("Sand", size);
@@ -218,7 +221,7 @@ namespace Rats.Game
 
         static Texture2D New(string name, int size) => new Texture2D(size, size, TextureFormat.RGBA32, true)
         {
-            name = name, filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Repeat,
+            name = name, filterMode = Smooth ? FilterMode.Trilinear : FilterMode.Point, wrapMode = TextureWrapMode.Repeat,
         };
 
         static Texture2D Done(Texture2D tex) { tex.Apply(true); return tex; }

@@ -21,6 +21,7 @@ namespace Rats.Game
 
         public static void Build(Transform world, Arena arena, VisualSettings look)
         {
+            ProcTex.Smooth = look.SmoothTextures;
             var cobbles = Lit(ProcTex.Cobbles(new Color(0.66f, 0.50f, 0.33f), 31), new Vector2((float)arena.RadiusX * 0.8f, (float)arena.RadiusZ * 0.8f)); // same cobble size at any arena size
             var dirt = Lit(ProcTex.Sand(new Color(0.34f, 0.24f, 0.18f), new Color(0.25f, 0.17f, 0.13f), 12), new Vector2(40f, 40f));
             var plaster = Lit(ProcTex.Plaster(new Color(0.66f, 0.55f, 0.42f), 41), new Vector2(1f, 2.5f));

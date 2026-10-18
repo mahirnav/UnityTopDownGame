@@ -1,9 +1,10 @@
 # RATS look settings (visual only; gameplay numbers live in tunables.txt). Edit, save, press F5.
 
-# --- PS2-style rendering ---
-PixelHeight = 360          # render height before upscaling: lower = chunkier pixels (0 = full resolution)
-ColorLevels = 24           # color steps per channel: lower = stronger banding (0 = off)
-Dither = 0.6               # ordered dither strength to hide banding (0 = none)
+# --- Rendering (defaults lean classic WoW; PS2 look: PixelHeight 360, ColorLevels 24, Dither 0.6, SmoothTextures false) ---
+PixelHeight = 0            # render height before upscaling: lower = chunkier pixels (0 = full resolution)
+ColorLevels = 0            # color steps per channel: lower = stronger banding (0 = off)
+Dither = 0                 # ordered dither strength to hide banding (0 = none)
+SmoothTextures = true      # true = smooth hand-painted look, false = crisp pixels
 FreezeDesaturate = 0.55    # world turns gray-blue during a freeze (0 = off)
 TintR = 1.06               # color grade: warm sunset (1, 1, 1 = neutral)
 TintG = 0.94

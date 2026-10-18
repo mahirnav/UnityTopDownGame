@@ -3,7 +3,7 @@ using UnityEngine;
 namespace Rats.Game
 {
     /// <summary>
-    /// PS2-style post effect on the world camera: renders down to PixelHeight with point filtering, then
+    /// Post effect on the world camera: warm color grade and the icy freeze tint; optionally (PS2 look) renders down to PixelHeight with point filtering, then
     /// color banding + ordered dither, and an icy desaturation while time is frozen. The HUD has its own
     /// camera, so text stays crisp.
     /// </summary>

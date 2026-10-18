@@ -13,7 +13,8 @@ Engine: **Unity 6000.3.26f1** (exact version; anyone opening the project must us
 - Keep it small: no frameworks, no speculative abstraction, no unrelated refactors.
 - **Every exploit Nick finds becomes an automated regression test.**
 - Commit working checkpoints. Commit messages and summaries say "tests pass" and "Nick playtested" separately.
-- No paid assets until the prototype is fun. Capsules / free placeholders (Mixamo) only.
+- Assets: free placeholders by default; small purchases (e.g. a stylized character pack) are OK once Nick approves them.
+  Nick sends candidates before buying. Never use ripped or copyrighted game assets (e.g. from WoW).
 
 ## Architecture rules (enforced by tests where possible)
 1. The sim (`unity/Assets/Sim`, plain C#, `noEngineReferences`) owns **all** gameplay state and runs on a fixed 60 Hz tick.
