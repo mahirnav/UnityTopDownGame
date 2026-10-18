@@ -30,6 +30,12 @@ Engine: **Unity 6000.3.26f1** (exact version; anyone opening the project must us
 10. No cross-machine determinism or rollback. Multiplayer will be host-authoritative: clients send inputs, host sends snapshots.
 11. No gameplay state in MonoBehaviours, statics, `Time.*`, Unity physics, or unseeded randomness.
     Randomness, when needed, is a seeded generator stored in sim state.
+12. **Sim math is `double`, never `float`/`MathF`** (only `InputFrame` holds floats). Unity's Mono keeps float
+    intermediates wider than .NET, so float sims diverge between the game and `dotnet test` (replays broke at tick 58).
+    `SimDoesNotUseFloatMath` enforces this. Convert to float only at the Unity boundary (`SimConvert`).
+
+Replays: every round on the sim-owning machine is recorded (`MatchRecording`: tunables + inputs), F9 saves now.
+An exploit replay Nick sends goes into `unity/SimTests/Replays/` and becomes a regression test automatically.
 
 Multiplayer-readiness tests that must stay green: **snapshot round-trip** (save → load → both sims stay identical)
 and **replay** (recorded inputs → bit-identical end state). If you add sim state, add it to the snapshot.

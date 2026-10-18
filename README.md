@@ -50,6 +50,17 @@ Host-authoritative: the host's machine runs the match; the other player sends in
 Built player shortcuts: `.\scripts\build.ps1` makes `unity/Builds/RATS/RATS.exe`; run `RATS.exe -host` or `RATS.exe -join 100.x.y.z`.
 Both sides need the same code version (the game refuses mismatched versions). Port 7777.
 
+## Replays (found an exploit? send the file)
+
+Every round on the machine running the sim (practice or host) is recorded: inputs only, ~1 KB per second.
+It saves automatically when a round ends, on restart and on quit. Press **F9** to save on the spot,
+e.g. right after something broken happens.
+
+- Files go to `unity/replays/` (editor) or `replays/` next to `RATS.exe`; the newest 100 are kept.
+- To turn one into a regression test, copy it into `unity/SimTests/Replays/`. Every test run replays it
+  and checks it still ends in exactly the same state. Assertions about *what* went wrong get added on top.
+- A deliberate rule change can make an old replay diverge; re-record or delete it then.
+
 ## Tests
 
 ```

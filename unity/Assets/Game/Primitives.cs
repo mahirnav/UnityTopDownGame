@@ -19,6 +19,6 @@ namespace Rats.Game
 
     static class SimConvert
     {
-        public static Vector3 ToUnity(Vec3 v) => new Vector3(v.X, v.Y, v.Z);
+        public static Vector3 ToUnity(Vec3 v) => new Vector3((float)v.X, (float)v.Y, (float)v.Z);
     }
 }

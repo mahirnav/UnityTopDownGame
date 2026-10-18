@@ -41,7 +41,9 @@ namespace Rats.Game
         CameraRig cameraRig;
         Transform world;
         int localIndex;
-        string tunablesText = "";
+        MatchRecording recording; // this machine's sim only (practice / host)
+        string replayMessage;
+        float replayMessageUntil;
         string tunablesError;
 
         // Multiplayer
@@ -66,15 +68,21 @@ namespace Rats.Game
             }
         }
 
-        void OnDestroy() => StopNetwork(); // frees the port when leaving play mode
+        void OnDestroy()
+        {
+            SaveRecording("quit");
+            StopNetwork(); // frees the port when leaving play mode
+        }
 
         /// <summary>
         /// New round on this machine's sim (practice or host). Called from Awake, on restart, or by editor tools.
         /// </summary>
         public void Build(Tunables overrideTunables = null)
         {
+            SaveRecording("restart");
             BuildWorld(overrideTunables ?? LoadTunables(), 0);
             Inputs[1] = host != null && host.HasPlayer ? host.RemoteInput : new SimpleBot(Sim, 1, Environment.TickCount);
+            recording = new MatchRecording(Sim.T);
         }
 
         void BuildWorld(Tunables tunables, int local)
@@ -114,12 +122,10 @@ namespace Rats.Game
             var path = Path.Combine(Application.streamingAssetsPath, "tunables.txt");
             try
             {
-                tunablesText = File.ReadAllText(path);
-                return Tunables.Parse(tunablesText);
+                return Tunables.Parse(File.ReadAllText(path));
             }
             catch (Exception e)
             {
-                tunablesText = ""; // an empty file means "all defaults" on the other side too
                 tunablesError = $"tunables.txt: {e.Message} (using defaults)";
                 Debug.LogError(tunablesError);
                 return new Tunables();
@@ -145,6 +151,8 @@ namespace Rats.Game
             int ticks = clock.Advance(Time.unscaledDeltaTime);
             for (int i = 0; i < ticks; i++) Step();
             if (ticks > 0) host?.SendSnapshot(Sim.SaveSnapshot());
+            if (Sim.Phase == Phase.RoundOver && recording != null) { SaveRecording("round"); recording = null; }
+            if (!menuOpen && Input.GetKeyDown(KeyCode.F9)) SaveRecording("marked");
         }
 
         void UpdateClient()
@@ -156,7 +164,13 @@ namespace Rats.Game
         }
 
         /// <summary>One sim tick with each fighter's input source.</summary>
-        public void Step() => Sim.Step(Inputs[0].Read(Sim.Tick), Inputs[1].Read(Sim.Tick));
+        public void Step()
+        {
+            var input0 = Inputs[0].Read(Sim.Tick);
+            var input1 = Inputs[1].Read(Sim.Tick);
+            recording?.Record(input0, input1);
+            Sim.Step(input0, input1);
+        }
 
         // --- Multiplayer ------------------------------------------------------------------
 
@@ -168,7 +182,7 @@ namespace Rats.Game
                 {
                     case HostSession.Event.PlayerJoined:
                         Build(); // fresh round with the remote player as fighter 1
-                        host.SendWelcome(tunablesText);
+                        host.SendWelcome(Sim.T.ToText());
                         menuOpen = false;
                         Debug.Log("[Net] player joined, round started as host");
                         break;
@@ -184,6 +198,8 @@ namespace Rats.Game
                 switch (client.Poll())
                 {
                     case ClientSession.Event.RoundStarted:
+                        SaveRecording("restart");
+                        recording = null; // the host records the match
                         BuildWorld(ParseHostTunables(client.RoundTunables), 1);
                         isClient = true;
                         menuOpen = false;
@@ -212,7 +228,7 @@ namespace Rats.Game
 
         void SendRestartToPlayer()
         {
-            if (host != null && host.HasPlayer) host.SendRestart(tunablesText);
+            if (host != null && host.HasPlayer) host.SendRestart(Sim.T.ToText());
         }
 
         void StartHosting()
@@ -253,6 +269,43 @@ namespace Rats.Game
             isClient = false;
         }
 
+        // --- Replays ----------------------------------------------------------------------
+
+        const int KeepReplays = 100;
+
+        /// <summary>unity/replays in the editor, next to RATS.exe in a build.</summary>
+        static string ReplayDirectory => Path.GetFullPath(Path.Combine(Application.dataPath, "..", "replays"));
+
+        /// <summary>Writes the current round so far and returns the path. Recording continues; F9 can be pressed any number of times.</summary>
+        public string SaveRecording(string reason)
+        {
+            if (recording == null || recording.Ticks < Tunables.TickRate || !Application.isPlaying) return null;
+            try
+            {
+                string mode = host != null && host.HasPlayer ? "online" : "practice";
+                recording.FinalSnapshot = Sim.SaveSnapshot();
+                recording.Note = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {mode} {reason}, tick {Sim.Tick}";
+                Directory.CreateDirectory(ReplayDirectory);
+                var path = Path.Combine(ReplayDirectory, $"{DateTime.Now:yyyyMMdd_HHmmss}_{mode}_{reason}_t{Sim.Tick}.ratsreplay");
+                using (var file = File.Create(path)) recording.Save(file);
+
+                var old = Directory.GetFiles(ReplayDirectory, "*.ratsreplay");
+                Array.Sort(old);
+                for (int i = 0; i < old.Length - KeepReplays; i++) File.Delete(old[i]);
+
+                replayMessage = $"Replay saved: {Path.GetFileName(path)}";
+                replayMessageUntil = Time.unscaledTime + 4f;
+                Debug.Log($"[Replay] saved {path}");
+                return path;
+            }
+            catch (IOException e)
+            {
+                replayMessage = $"Replay not saved: {e.Message}";
+                replayMessageUntil = Time.unscaledTime + 6f;
+                return null;
+            }
+        }
+
         // --- Views ------------------------------------------------------------------------
 
         public void SyncViews(float deltaTime, bool snapCamera = false)
@@ -265,7 +318,7 @@ namespace Rats.Game
                 {
                     view = Primitives.Create(PrimitiveType.Sphere, world, new Color(1f, 0.45f, 0.1f));
                     view.name = $"Projectile {p.Id}";
-                    view.transform.localScale = Vector3.one * (Sim.T.ProjectileRadius * 2f);
+                    view.transform.localScale = Vector3.one * (float)(Sim.T.ProjectileRadius * 2);
                     projectileViews[p.Id] = view;
                 }
                 view.transform.position = SimConvert.ToUnity(p.Position);
@@ -302,7 +355,7 @@ namespace Rats.Game
 
             var sand = Primitives.Create(PrimitiveType.Cylinder, world, SandColor);
             sand.name = "Sand";
-            sand.transform.localScale = new Vector3(arena.RadiusX * 2f, 0.01f, arena.RadiusZ * 2f);
+            sand.transform.localScale = new Vector3((float)arena.RadiusX * 2f, 0.01f, (float)arena.RadiusZ * 2f);
 
             for (int i = 0; i < WallSegments; i++)
             {
@@ -320,14 +373,14 @@ namespace Rats.Game
                 var pillar = Primitives.Create(PrimitiveType.Cylinder, world, StoneColor * 1.15f);
                 pillar.name = "Pillar";
                 pillar.transform.localPosition = SimConvert.ToUnity(c) + Vector3.up * (PillarHeight * 0.5f);
-                pillar.transform.localScale = new Vector3(arena.PillarRadius * 2f, PillarHeight * 0.5f, arena.PillarRadius * 2f);
+                pillar.transform.localScale = new Vector3((float)arena.PillarRadius * 2f, PillarHeight * 0.5f, (float)arena.PillarRadius * 2f);
             }
         }
 
         static Vector3 EllipsePoint(Arena arena, int i, float outset)
         {
             float angle = i * Mathf.PI * 2f / WallSegments;
-            return new Vector3(Mathf.Cos(angle) * (arena.RadiusX + outset), 0f, Mathf.Sin(angle) * (arena.RadiusZ + outset));
+            return new Vector3(Mathf.Cos(angle) * ((float)arena.RadiusX + outset), 0f, Mathf.Sin(angle) * ((float)arena.RadiusZ + outset));
         }
 
         // --- Overlay and menu -------------------------------------------------------------
@@ -343,7 +396,7 @@ namespace Rats.Game
             string phase = Sim.Phase == Phase.Combat ? $"COMBAT  {Sim.PhaseTicksLeft / 60f:F1}s"
                          : Sim.Phase == Phase.Freeze ? $"FROZEN  {Sim.PhaseTicksLeft / 60f:F1}s"
                          : "ROUND OVER";
-            string restartKeys = isClient ? "" : "  Enter restart  F5 reload tunables";
+            string restartKeys = isClient ? "" : "  Enter restart  F5 reload tunables  F9 save replay";
             GUI.Label(new Rect(12, 8, 900, 140),
                 $"Turn {Sim.Turn}   {phase}\n" +
                 $"tick {Sim.Tick}   combat tick {Sim.CombatTick}\n" +
@@ -352,6 +405,7 @@ namespace Rats.Game
                 $"WASD move  J melee  K ranged  Space dash  Tab lock  Q/E orbit{restartKeys}  Esc multiplayer\n" +
                 NetStatusLine());
             if (tunablesError != null) GUI.Label(new Rect(12, 150, 900, 40), tunablesError);
+            if (replayMessage != null && Time.unscaledTime < replayMessageUntil) GUI.Label(new Rect(12, 170, 900, 40), replayMessage);
 
             if (Sim.Phase == Phase.RoundOver)
             {

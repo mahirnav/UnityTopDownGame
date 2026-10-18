@@ -56,7 +56,7 @@ namespace Rats.Sim
     {
         public const int NoWinner = -1;
         public const int Draw = 2;
-        const int SnapshotVersion = 1;
+        const int SnapshotVersion = 2; // 2: doubles
 
         public readonly Tunables T;
         public readonly Arena Arena;
@@ -81,9 +81,9 @@ namespace Rats.Sim
             for (int i = 0; i < 2; i++)
             {
                 var f = Fighters[i];
-                float side = i == 0 ? -1f : 1f;
-                f.Position = new Vec3(side * T.StartOffsetX, 0f, 0f);
-                f.Facing = new Vec3(-side, 0f, 0f);
+                double side = i == 0 ? -1 : 1;
+                f.Position = new Vec3(side * T.StartOffsetX, 0, 0);
+                f.Facing = new Vec3(-side, 0, 0);
                 f.Hp = T.MaxHp;
                 f.LockedOn = true;
             }
@@ -217,24 +217,24 @@ namespace Rats.Sim
 
         static Vec3 MoveVector(InputFrame input)
         {
-            var move = new Vec3(input.MoveX, 0f, input.MoveZ);
-            return move.Length > 1f ? move.Normalized : move;
+            var move = new Vec3(input.MoveX, 0, input.MoveZ);
+            return move.Length > 1 ? move.Normalized : move;
         }
 
         static Vec3 FaceToward(Fighter f, Fighter target)
         {
             var d = (target.Position - f.Position).Flat;
-            return d.Length > 1e-4f ? d.Normalized : f.Facing;
+            return d.Length > 1e-4 ? d.Normalized : f.Facing;
         }
 
         void SeparateFighters()
         {
             Fighter a = Fighters[0], b = Fighters[1];
             var d = (b.Position - a.Position).Flat;
-            float dist = d.Length, min = 2f * T.FighterRadius;
+            double dist = d.Length, min = 2 * T.FighterRadius;
             if (dist >= min) return;
-            var normal = dist > 1e-6f ? d / dist : new Vec3(1f, 0f, 0f);
-            var push = normal * ((min - dist) * 0.5f);
+            var normal = dist > 1e-6 ? d / dist : new Vec3(1, 0, 0);
+            var push = normal * ((min - dist) * 0.5);
             a.Position = Arena.Constrain(a.Position - push, T.FighterRadius);
             b.Position = Arena.Constrain(b.Position + push, T.FighterRadius);
         }
@@ -263,10 +263,10 @@ namespace Rats.Sim
             if (f.Action != ActionKind.Melee || f.ActionHitLanded || !T.Melee.IsActive(f.ActionTick)) return;
             var target = Opponent(f);
             var to = (target.Position - f.Position).Flat;
-            float dist = to.Length;
+            double dist = to.Length;
             if (dist > T.MeleeRange + T.FighterRadius) return;
-            float cosHalfArc = MathF.Cos(T.MeleeArcDegrees * 0.5f * MathF.PI / 180f);
-            if (dist > 1e-4f && Vec3.Dot(f.Facing, to / dist) < cosHalfArc) return;
+            double cosHalfArc = Math.Cos(T.MeleeArcDegrees * 0.5 * Math.PI / 180);
+            if (dist > 1e-4 && Vec3.Dot(f.Facing, to / dist) < cosHalfArc) return;
             target.Hp -= T.MeleeDamage;
             f.ActionHitLanded = true;
         }
@@ -336,6 +336,6 @@ namespace Rats.Sim
         }
 
         static void Write(BinaryWriter w, Vec3 v) { w.Write(v.X); w.Write(v.Y); w.Write(v.Z); }
-        static Vec3 ReadVec(BinaryReader r) => new Vec3(r.ReadSingle(), r.ReadSingle(), r.ReadSingle());
+        static Vec3 ReadVec(BinaryReader r) => new Vec3(r.ReadDouble(), r.ReadDouble(), r.ReadDouble());
     }
 }

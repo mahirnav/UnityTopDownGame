@@ -50,7 +50,7 @@ namespace Rats.SimTests
             RunUntil(sim, s => s.IsFrozen, in0: dash);
             var mid = sim.Fighters[0].Position;
             Assert.That(sim.Fighters[0].Action, Is.EqualTo(ActionKind.Dash), "freeze should land mid-dash");
-            Assert.That(mid.Z - origin.Z, Is.GreaterThan(0f).And.LessThan(t.DashSpeed * t.DashActive / 60f));
+            Assert.That(mid.Z - origin.Z, Is.GreaterThan(0).And.LessThan(t.DashSpeed * t.DashActive / 60.0));
 
             RunUntil(sim, s => !s.IsFrozen, in0: dash);
             Assert.That(sim.Fighters[0].Position, Is.EqualTo(mid), "fighter moved during the freeze");
@@ -59,8 +59,8 @@ namespace Rats.SimTests
             var reference = WithFreeze(0);
             RunUntil(reference, s => s.CombatTick == sim.CombatTick, in0: dash);
             Assert.That(sim.Fighters[0].Position, Is.EqualTo(reference.Fighters[0].Position), "not bit-exact with the unfrozen dash");
-            float distance = sim.Fighters[0].Position.Z - origin.Z;
-            Assert.That(distance, Is.EqualTo(t.DashSpeed * t.DashActive / 60f).Within(1e-4f), "dash distance");
+            double distance = sim.Fighters[0].Position.Z - origin.Z;
+            Assert.That(distance, Is.EqualTo(t.DashSpeed * t.DashActive / 60.0).Within(1e-9), "dash distance");
         }
 
         [Test]

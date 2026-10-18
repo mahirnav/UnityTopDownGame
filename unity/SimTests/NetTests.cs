@@ -96,7 +96,7 @@ namespace Rats.SimTests
             Assert.That(view.SaveSnapshot(), Is.EqualTo(sim.SaveSnapshot()), "client view differs from host sim");
             Assert.That(sim.ActionLog.Exists(e => e.Fighter == 1 && e.Kind == ActionKind.Ranged), Is.True,
                 "the client's ranged press never reached the host sim");
-            Assert.That(sim.Fighters[1].Position.Z, Is.Not.EqualTo(0f), "the client's movement never reached the host sim");
+            Assert.That(sim.Fighters[1].Position.Z, Is.Not.EqualTo(0.0), "the client's movement never reached the host sim");
         }
 
         [Test]

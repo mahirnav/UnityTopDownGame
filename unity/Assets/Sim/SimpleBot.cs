@@ -32,8 +32,8 @@ namespace Rats.Sim
             var me = sim.Fighters[index];
             var them = sim.Opponent(me);
             var to = (them.Position - me.Position).Flat;
-            float dist = to.Length;
-            var dir = dist > 1e-4f ? to / dist : Vec3.Zero;
+            double dist = to.Length;
+            var dir = dist > 1e-4 ? to / dist : Vec3.Zero;
             bool lineOfSight = sim.Arena.LineOfSight(me.Position, them.Position);
 
             if (!me.LockedOn && lineOfSight) frame.ToggleLock = true;
@@ -43,16 +43,16 @@ namespace Rats.Sim
                 strafeSign = rng.Next(2) == 0 ? -1 : 1;
                 nextStrafeFlip = tick + rng.Next(40, 120);
             }
-            var side = new Vec3(-dir.Z, 0f, dir.X) * strafeSign;
-            var move = dist > 7f ? dir : dist < 2.5f ? dir * -1f : side;
-            frame.MoveX = move.X;
-            frame.MoveZ = move.Z;
+            var side = new Vec3(-dir.Z, 0, dir.X) * strafeSign;
+            var move = dist > 7 ? dir : dist < 2.5 ? dir * -1 : side;
+            frame.MoveX = (float)move.X;
+            frame.MoveZ = (float)move.Z;
 
             if (!me.IsBusy && me.ActionPoints > 0 && tick >= nextActionTick)
             {
                 if (dist < sim.T.MeleeRange + sim.T.FighterRadius) frame.Melee = true;
-                else if (dist < 10f && lineOfSight) frame.Ranged = true;
-                else if (dist >= 10f) frame.Dash = true;
+                else if (dist < 10 && lineOfSight) frame.Ranged = true;
+                else if (dist >= 10) frame.Dash = true;
                 if (frame.Melee || frame.Ranged || frame.Dash) nextActionTick = tick + rng.Next(25, 110);
             }
             return frame;

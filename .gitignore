@@ -24,3 +24,7 @@ captures/
 Thumbs.db
 .DS_Store
 .idea/
+
+# Match recordings saved while playing (copy one into unity/SimTests/Replays to keep it as a test)
+unity/replays/
+unity/Builds/RATS/replays/

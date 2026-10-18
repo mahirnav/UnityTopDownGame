@@ -13,7 +13,7 @@ namespace Rats.Sim
     public sealed class Tunables
     {
         public const int TickRate = 60;
-        public const float TickDt = 1f / TickRate;
+        public const double TickDt = 1.0 / TickRate;
 
         // Turn structure
         public int TurnTicks = 480;            // 8 s of combat
@@ -22,8 +22,8 @@ namespace Rats.Sim
 
         // Fighters
         public int MaxHp = 100;
-        public float FighterRadius = 0.4f;
-        public float MoveSpeed = 5f;           // m/s, walking (not during actions)
+        public double FighterRadius = 0.4;
+        public double MoveSpeed = 5;           // m/s, walking (not during actions)
 
         // Melee
         public int MeleeCost = 1;
@@ -31,15 +31,15 @@ namespace Rats.Sim
         public int MeleeActive = 6;
         public int MeleeRecovery = 20;
         public int MeleeDamage = 20;
-        public float MeleeRange = 1.6f;        // m from center, hitbox reach
-        public float MeleeArcDegrees = 120f;   // total arc in front of the fighter
+        public double MeleeRange = 1.6;        // m from center, hitbox reach
+        public double MeleeArcDegrees = 120;   // total arc in front of the fighter
 
         // Dash
         public int DashCost = 1;
         public int DashStartup = 3;
         public int DashActive = 12;
         public int DashRecovery = 8;
-        public float DashSpeed = 18f;          // m/s during active ticks
+        public double DashSpeed = 18;          // m/s during active ticks
 
         // Ranged
         public int RangedCost = 1;
@@ -47,18 +47,18 @@ namespace Rats.Sim
         public int RangedActive = 1;
         public int RangedRecovery = 18;
         public int RangedDamage = 10;
-        public float ProjectileSpeed = 14f;    // m/s
-        public float ProjectileRadius = 0.15f;
+        public double ProjectileSpeed = 14;    // m/s
+        public double ProjectileRadius = 0.15;
         public int ProjectileLifetimeTicks = 180;
-        public float ProjectileSpawnHeight = 1f;
+        public double ProjectileSpawnHeight = 1;
 
         // Arena (oval pit, origin at center)
-        public float ArenaRadiusX = 14f;
-        public float ArenaRadiusZ = 10f;
-        public float PillarRadius = 0.9f;
-        public float PillarOffsetX = 5.5f;     // 4 pillars at (+-X, +-Z)
-        public float PillarOffsetZ = 4f;
-        public float StartOffsetX = 9f;        // fighters start at (-X, 0) and (+X, 0)
+        public double ArenaRadiusX = 14;
+        public double ArenaRadiusZ = 10;
+        public double PillarRadius = 0.9;
+        public double PillarOffsetX = 5.5;     // 4 pillars at (+-X, +-Z)
+        public double PillarOffsetZ = 4;
+        public double StartOffsetX = 9;        // fighters start at (-X, 0) and (+X, 0)
 
         public ActionDef Melee => new ActionDef(MeleeCost, MeleeStartup, MeleeActive, MeleeRecovery);
         public ActionDef Dash => new ActionDef(DashCost, DashStartup, DashActive, DashRecovery);
@@ -112,6 +112,20 @@ namespace Rats.Sim
                 }
             }
             return t;
+        }
+
+        /// <summary>Every value as "Name = value" lines that Parse reads back exactly (floats round-trip).</summary>
+        public string ToText()
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (var f in Fields())
+            {
+                var v = f.GetValue(this);
+                string text = v is double fl ? fl.ToString("R", CultureInfo.InvariantCulture)
+                            : System.Convert.ToString(v, CultureInfo.InvariantCulture);
+                sb.Append(f.Name).Append(" = ").Append(text).Append('\n');
+            }
+            return sb.ToString();
         }
 
         static IEnumerable<FieldInfo> Fields() =>

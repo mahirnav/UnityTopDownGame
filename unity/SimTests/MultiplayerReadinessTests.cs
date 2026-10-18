@@ -71,7 +71,7 @@ namespace Rats.SimTests
                 seed++;
                 var t = f.FieldType;
                 object v = t == typeof(int) ? seed + 3
-                         : t == typeof(float) ? seed * 1.25f
+                         : t == typeof(double) ? seed * 1.25
                          : t == typeof(bool) ? true
                          : t == typeof(Vec3) ? new Vec3(seed, seed + 0.5f, -seed)
                          : t.IsEnum ? System.Enum.GetValues(t).GetValue(1)

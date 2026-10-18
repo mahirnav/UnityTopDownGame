@@ -48,6 +48,8 @@ namespace Rats.EditorTools
 
             var bootstrap = Object.FindAnyObjectByType<Bootstrap>();
             int tick = bootstrap != null && bootstrap.Sim != null ? bootstrap.Sim.Tick : -1;
+            var replay = bootstrap != null ? bootstrap.SaveRecording("smoke") : null;
+            Debug.Log($"[PlaySmoke] replay: {replay ?? "none"}");
             bool ok = errors == 0 && tick > 0;
             Debug.Log($"[PlaySmoke] sim tick after {RunSeconds}s: {tick}, errors from Rats code: {errors} -> {(ok ? "PASS" : "FAIL")}");
             EditorApplication.Exit(ok ? 0 : 1);

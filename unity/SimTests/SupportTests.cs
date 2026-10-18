@@ -22,7 +22,7 @@ namespace Rats.SimTests
         {
             var t = Tunables.Parse("TurnTicks = 300  # five seconds\nDashSpeed = 12.5\n");
             Assert.That(t.TurnTicks, Is.EqualTo(300));
-            Assert.That(t.DashSpeed, Is.EqualTo(12.5f));
+            Assert.That(t.DashSpeed, Is.EqualTo(12.5));
             Assert.That(t.FreezeTicks, Is.EqualTo(new Tunables().FreezeTicks), "unlisted keys keep defaults");
         }
 
@@ -33,6 +33,31 @@ namespace Rats.SimTests
             StringAssert.Contains("line 2", unknown.Message);
             var badNumber = Assert.Throws<FormatException>(() => Tunables.Parse("MaxHp = lots"));
             StringAssert.Contains("MaxHp", badNumber.Message);
+        }
+    }
+
+    public class SimSourceTests
+    {
+        /// <summary>
+        /// Regression: Unity's Mono keeps float intermediates wider than .NET, so float math made replays
+        /// recorded in the game diverge in these tests (first at tick 58). The sim uses double throughout;
+        /// only InputFrame keeps floats (raw stick/keyboard values, converted exactly to double).
+        /// </summary>
+        [Test]
+        public void SimDoesNotUseFloatMath()
+        {
+            var simDir = Path.GetFullPath(Path.Combine(TestContext.CurrentContext.TestDirectory, "../../../../Assets/Sim"));
+            foreach (var file in Directory.GetFiles(simDir, "*.cs", SearchOption.AllDirectories))
+            {
+                if (Path.GetFileName(file) == "Input.cs") continue;
+                var lines = File.ReadAllLines(file);
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    var code = lines[i].Split("//")[0].Replace("(float)", ""); // casts into InputFrame are fine
+                    Assert.That(System.Text.RegularExpressions.Regex.IsMatch(code, @"\bfloat\b|MathF\.|\d[fF]\b"), Is.False,
+                        $"{Path.GetFileName(file)}:{i + 1} uses float math: {lines[i].Trim()}");
+                }
+            }
         }
     }
 
