@@ -5,7 +5,7 @@ namespace Rats.Game
 {
     /// <summary>
     /// Third-person camera for one fighter. Locked on: sits behind the fighter on the line from the
-    /// opponent, framing both. Free: orbits behind with Q/E. Purely visual; reads sim state only.
+    /// opponent, framing both. Free: orbits behind with Q/E. Stays inside the arena walls. Purely visual.
     /// </summary>
     public sealed class CameraRig
     {
@@ -21,7 +21,15 @@ namespace Rats.Game
         /// <summary>Kick the camera; decays over a fraction of a second (visual only).</summary>
         public void AddShake(float amount) => shake = Mathf.Max(shake, amount);
 
-        public CameraRig(Camera camera) { Camera = camera; }
+        readonly float wallX, wallZ;
+
+        /// <summary>The arena's oval radii keep the camera inside the (tall) walls.</summary>
+        public CameraRig(Camera camera, Arena arena)
+        {
+            Camera = camera;
+            wallX = (float)arena.RadiusX - 0.9f;
+            wallZ = (float)arena.RadiusZ - 0.9f;
+        }
 
         public void Update(Fighter me, Fighter target, float deltaTime, bool snap = false)
         {
@@ -45,6 +53,7 @@ namespace Rats.Game
                 lookAt = self + Vector3.up * 1.5f + forward * 2f + right * (Shoulder * 0.5f);
             }
 
+            desired = InsideWalls(self + Vector3.up * Height, desired);
             var t = Camera.transform;
             float blend = snap ? 1f : 1f - Mathf.Exp(-FollowRate * deltaTime);
             if (!hasPosition) { smoothPosition = t.position; hasPosition = true; }
@@ -55,5 +64,20 @@ namespace Rats.Game
             // Set exactly once on target: slerping a rotation onto itself wobbles by a hair, which the low-res effect turns into pixel flicker.
             t.rotation = snap || Quaternion.Angle(t.rotation, look) < 0.05f ? look : Quaternion.Slerp(t.rotation, look, blend);
         }
+
+        /// <summary>If the camera would end up behind the wall, pull it in along the line toward the fighter.</summary>
+        Vector3 InsideWalls(Vector3 pivot, Vector3 desired)
+        {
+            if (Inside(desired)) return desired;
+            float lo = 0f, hi = 1f;
+            for (int i = 0; i < 12; i++)
+            {
+                float mid = (lo + hi) * 0.5f;
+                if (Inside(Vector3.Lerp(pivot, desired, mid))) lo = mid; else hi = mid;
+            }
+            return Vector3.Lerp(pivot, desired, lo) + Vector3.up * (1f - lo) * 1.2f; // rise a little when pulled in
+        }
+
+        bool Inside(Vector3 p) => (p.x * p.x) / (wallX * wallX) + (p.z * p.z) / (wallZ * wallZ) <= 1f;
     }
 }

@@ -17,11 +17,13 @@ namespace Rats.Game
         public int ColorLevels = 24;           // color steps per channel (0 = no banding)
         public float Dither = 0.6f;            // ordered dither strength (0 = none)
         public float FreezeDesaturate = 0.55f; // how gray/icy the world goes during a freeze (0 = off)
+        public float TintR = 1.06f, TintG = 0.94f, TintB = 0.86f; // warm sunset grade (1,1,1 = neutral)
+        public float Saturation = 1.12f;       // 1 = unchanged
 
         // Atmosphere
-        public float FogStart = 18f;
-        public float FogEnd = 55f;
-        public float SunIntensity = 1.15f;
+        public float FogStart = 14f;
+        public float FogEnd = 70f;
+        public float SunIntensity = 1.3f;
         public int CrowdSize = 160;            // spectator silhouettes around the pit
 
         // Combat effects

@@ -22,6 +22,10 @@ Where the game is heading, from Nick's design discussions. Three levels, and the
   (no point cost) and always complete once started. A **fire ring** starts closing at 30 s and fully closes at **90 s**
   (combat time); fire damage **ramps** the longer you stand in it and can down you. At the cap, higher HP% wins.
   Optional `FinalStageTurnTicks` shortens turns once the ring closes (off by default). The bot avoids fire and executes.
+- **Art direction (Nick, 2026-10-18):** gritty gladiator / western / ninja; classic-WoW-style arena (tall cracked plaster walls,
+  stone buttresses, arched gate, wooden posts on spiked iron bases, chains, cobbled dirt with ochre patches) under a
+  red-orange hazy sunset. **Visual pass 2 (built)** follows those references; the camera stays inside the taller walls.
+  Next art step: a real character model (Nick is sourcing one; rigged humanoid FBX + ~6 animations).
 - **Visual pass 1 (built, all knobs in visuals.txt):** PS2-style render (360p point upscale, color banding + dither),
   icy desaturation during freezes, painted dusk sky, generated sand/stone textures, wall caps, pillar bases/caps, tiered
   stands with a crowd, torches with flickering light, banners; hit sparks, dash dust, bolt trails, swing-arc flash showing

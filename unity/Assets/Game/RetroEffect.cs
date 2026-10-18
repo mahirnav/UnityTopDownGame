@@ -29,6 +29,8 @@ namespace Rats.Game
             material.SetFloat("_Levels", Look.ColorLevels);
             material.SetFloat("_Dither", Look.Dither);
             material.SetFloat("_Freeze", Freeze * Look.FreezeDesaturate);
+            material.SetVector("_Tint", new Vector4(Look.TintR, Look.TintG, Look.TintB, 1f));
+            material.SetFloat("_Saturation", Look.Saturation);
             Graphics.Blit(low, dst, material);
             RenderTexture.ReleaseTemporary(low);
         }

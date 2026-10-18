@@ -1,5 +1,5 @@
 // PS2-era post effect: the image arrives already downscaled (point-filtered), then gets color banding with
-// ordered dithering in low-res pixel space, plus an icy desaturation during freezes.
+// ordered dithering in low-res pixel space, a warm color grade, plus an icy desaturation during freezes.
 Shader "Hidden/RatsRetro"
 {
     Properties { _MainTex ("Texture", 2D) = "white" {} }
@@ -19,6 +19,8 @@ Shader "Hidden/RatsRetro"
             float _Levels;    // color steps per channel, 0 = off
             float _Dither;    // dither strength
             float _Freeze;    // 0..1 desaturate toward icy gray
+            float3 _Tint;     // color grade multiplier (warm sunset)
+            float _Saturation;
 
             float Bayer4(int2 p)
             {
@@ -30,6 +32,8 @@ Shader "Hidden/RatsRetro"
             {
                 fixed4 c = tex2D(_MainTex, i.uv);
                 float gray = dot(c.rgb, float3(0.299, 0.587, 0.114));
+                c.rgb = lerp(float3(gray, gray, gray), c.rgb, _Saturation) * _Tint;
+                gray = dot(c.rgb, float3(0.299, 0.587, 0.114));
                 c.rgb = lerp(c.rgb, float3(gray * 0.82, gray * 0.95, gray * 1.15), _Freeze);
                 if (_Levels > 0)
                 {
