@@ -15,6 +15,16 @@ namespace Rats.Game
             renderer.sharedMaterial = new Material(renderer.sharedMaterial) { color = color };
             return go;
         }
+
+        /// <summary>Same, sharing one material (arena pieces use a handful of materials between them).</summary>
+        public static GameObject Create(PrimitiveType type, Transform parent, Material shared)
+        {
+            var go = GameObject.CreatePrimitive(type);
+            Object.DestroyImmediate(go.GetComponent<Collider>());
+            go.transform.SetParent(parent, false);
+            go.GetComponent<Renderer>().sharedMaterial = shared;
+            return go;
+        }
     }
 
     static class SimConvert

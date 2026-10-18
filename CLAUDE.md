@@ -68,6 +68,11 @@ Screenshots/logs go to `captures/` (git-ignored). Look at the screenshots after 
 - Play mode reloads the script domain; editor automation must keep state in `SessionState`.
 - PlayableGraph manual Evaluate doesn't pose models outside play mode; use `AnimationClip.SampleAnimation`.
 - Sim code must compile as C# 9 (no newer syntax); `dotnet test` enforces this.
+- Any shader that code finds with `Shader.Find` must be listed in `PlayerBuild.CodeOnlyShaders`, or builds strip it (magenta).
+- The HUD is uGUI on its own camera (`RenderAll` renders world + HUD), so headless captures show it. Damage pop-ups,
+  particles and time-based fades don't render faithfully in edit-mode captures; check those in play mode.
+- Visual knobs live in `visuals.txt` (`VisualSettings`), never in `tunables.txt` (gameplay only, sent to clients and replays).
+- Don't screen-grab the desktop or pop game windows to check visuals; use the headless capture.
 
 ## Design direction
 Read `docs/design-direction.md` before design work: what's **approved**, what's only a **leaning**, and what's open.

@@ -1,0 +1,17 @@
+# RATS look settings (visual only; gameplay numbers live in tunables.txt). Edit, save, press F5.
+
+# --- PS2-style rendering ---
+PixelHeight = 360          # render height before upscaling: lower = chunkier pixels (0 = full resolution)
+ColorLevels = 24           # color steps per channel: lower = stronger banding (0 = off)
+Dither = 0.6               # ordered dither strength to hide banding (0 = none)
+FreezeDesaturate = 0.55    # world turns gray-blue during a freeze (0 = off)
+
+# --- Atmosphere ---
+FogStart = 18
+FogEnd = 55
+SunIntensity = 1.15
+CrowdSize = 160            # spectator silhouettes around the pit
+
+# --- Combat effects ---
+ShakeScale = 1             # camera shake multiplier (0 = off)
+SwingArcs = true           # flash the melee reach during active frames

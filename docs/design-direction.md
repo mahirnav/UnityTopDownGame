@@ -17,6 +17,10 @@ Where the game is heading, from Nick's design discussions. Three levels, and the
 - **Backstabs (built, tunable):** melee from the target's 90° rear cone deals +50%, read when the hit lands. Possible because turning is no longer instant.
 - **Hit feedback and turn-end cue (built, visual only):** damage pop-ups (BACKSTAB!), flinch, camera shake, a 1 s icy tint + shrinking bar + 3 blips before each freeze, "FROZEN" flash and tone.
 - **Bot:** circles, dodges swings it sees coming, keeps its last point to punish, takes backstabs.
+- **Visual pass 1 (built, all knobs in visuals.txt):** PS2-style render (360p point upscale, color banding + dither),
+  icy desaturation during freezes, painted dusk sky, generated sand/stone textures, wall caps, pillar bases/caps, tiered
+  stands with a crowd, torches with flickering light, banners; hit sparks, dash dust, bolt trails, swing-arc flash showing
+  melee reach; uGUI HUD (HP bars, your pips, turn timer, draft cards, round/match banners); debug text behind F1.
 - **Startup walking and lock-on grace** exist as tunables, default off, to A/B in playtests.
 - **Online:** host-authoritative direct connection over Tailscale now; real matchmaking later.
 

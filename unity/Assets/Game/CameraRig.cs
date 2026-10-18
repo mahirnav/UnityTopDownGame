@@ -52,7 +52,8 @@ namespace Rats.Game
             shake = Mathf.Max(0f, shake - deltaTime * 1.2f);
             t.position = smoothPosition + (shake > 0f ? Random.insideUnitSphere * shake : Vector3.zero);
             var look = Quaternion.LookRotation(lookAt - smoothPosition, Vector3.up);
-            t.rotation = snap ? look : Quaternion.Slerp(t.rotation, look, blend);
+            // Set exactly once on target: slerping a rotation onto itself wobbles by a hair, which the low-res effect turns into pixel flicker.
+            t.rotation = snap || Quaternion.Angle(t.rotation, look) < 0.05f ? look : Quaternion.Slerp(t.rotation, look, blend);
         }
     }
 }

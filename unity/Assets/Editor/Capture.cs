@@ -49,20 +49,49 @@ namespace Rats.EditorTools
             bootstrap.Inputs[1] = p1;
             var sim = bootstrap.Sim;
 
-            Shot(bootstrap, dir, "p0_start.png");
+            Shot(bootstrap, dir, "look_start.png");
             while (!sim.IsFrozen) StepAndSync(bootstrap);
             bootstrap.SyncViews(0f, snapCamera: true); // settle the follow camera so only sim-driven visuals can differ
-            var start = Shot(bootstrap, dir, "p0_frozen_start.png");
+            Shot(bootstrap, dir, "look_draft.png");
+            var start = Shot(bootstrap, dir, "p0_frozen_start.png", worldOnly: true); // HUD timer counts down, so compare the world
             bool caughtMidAction = sim.Projectiles.Count == 1 && sim.Fighters[1].Action == ActionKind.Dash;
 
             for (int frame = 0; frame < HoldFrames; frame++) StepAndSync(bootstrap);
-            var end = Shot(bootstrap, dir, "p0_frozen_end.png");
-            bool identical = start.AsSpan().SequenceEqual(end);
-            Debug.Log($"[Capture] caught mid-action: {caughtMidAction}, frozen frames pixel-identical: {identical}");
+            var end = Shot(bootstrap, dir, "p0_frozen_end.png", worldOnly: true);
+            int changed = ChangedPixels(start, end);
+            bool identical = changed == 0; // tolerant of 1-2 step GPU noise (lights, soft shadows); a moving object changes far more
+            Debug.Log($"[Capture] caught mid-action: {caughtMidAction}, frozen frames unchanged: {identical} ({changed} px changed beyond noise)");
 
             while (sim.IsFrozen) StepAndSync(bootstrap);
             for (int i = 0; i < 30; i++) StepAndSync(bootstrap);
             Shot(bootstrap, dir, "p0_after_resume.png");
+
+            // A backstab up close: sparks, swing arc, pop-up. Then finish the round for the banner.
+            var me = sim.Fighters[0];
+            var them = sim.Fighters[1];
+            me.Position = new Vec3(0, 0, 0);
+            them.Position = new Vec3(1.3, 0, 0.2);
+            them.Facing = new Vec3(1, 0, 0);
+            them.LockedOn = false;
+            var swing = new ScriptedInput();
+            swing.Set(sim.Tick, new InputFrame { Melee = true });
+            bootstrap.Inputs[0] = swing;
+            bootstrap.Inputs[1] = new ScriptedInput();
+            int hpBefore = them.Hp;
+            for (int i = 0; i < 60 && them.Hp == hpBefore; i++) StepAndSync(bootstrap);
+            StepAndSync(bootstrap);
+            Shot(bootstrap, dir, "look_hit.png");
+            them.Hp = 1;
+            var finish = new ScriptedInput();
+            for (int k = 0; k < 2000; k++) finish.Set(sim.Tick + k, new InputFrame { Melee = true }); // swing whenever possible
+            bootstrap.Inputs[0] = finish;
+            for (int i = 0; i < 2000 && sim.Phase != Phase.RoundOver && sim.Phase != Phase.MatchOver; i++)
+            {
+                them.Position = new Vec3(1.3, 0, 0.2); // keep the target in reach (the bot isn't driving it)
+                StepAndSync(bootstrap);
+            }
+            StepAndSync(bootstrap);
+            Shot(bootstrap, dir, "look_round.png");
             return identical && caughtMidAction ? 0 : 2;
         }
 
@@ -72,18 +101,26 @@ namespace Rats.EditorTools
             b.SyncViews(1f / 60f);
         }
 
-        static byte[] Shot(Bootstrap b, string dir, string fileName)
+        static byte[] Shot(Bootstrap b, string dir, string fileName, bool worldOnly = false)
         {
             const int w = 1280, h = 720;
             var rt = RenderTexture.GetTemporary(w, h, 24);
-            var cam = b.Camera;
-            cam.targetTexture = rt;
-            cam.Render();
+            if (worldOnly)
+            {
+                // Raw world render for the frozen comparison: the retro color banding turns 1-bit GPU noise into
+                // whole-pixel flips, and this check is about sim-driven state, not the post effect.
+                var retro = b.Camera.GetComponent<RetroEffect>();
+                retro.enabled = false;
+                b.Camera.targetTexture = rt;
+                b.Camera.Render();
+                b.Camera.targetTexture = null;
+                retro.enabled = true;
+            }
+            else b.RenderAll(rt);
             RenderTexture.active = rt;
             var tex = new Texture2D(w, h, TextureFormat.RGB24, false);
             tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
             tex.Apply();
-            cam.targetTexture = null;
             RenderTexture.active = null;
             RenderTexture.ReleaseTemporary(rt);
 
@@ -97,6 +134,23 @@ namespace Rats.EditorTools
             Debug.Log($"[Capture] {path}  tick={sim.Tick}  combat={sim.CombatTick}  phase={sim.Phase}  " +
                       $"f1={sim.Fighters[1].Action}:{sim.Fighters[1].ActionTick}  projectile={proj}");
             return png;
+        }
+
+        /// <summary>Pixels whose color moved by more than a small noise threshold between two PNGs.</summary>
+        static int ChangedPixels(byte[] pngA, byte[] pngB, int threshold = 8)
+        {
+            var a = new Texture2D(2, 2);
+            var b = new Texture2D(2, 2);
+            a.LoadImage(pngA);
+            b.LoadImage(pngB);
+            var pa = a.GetPixels32();
+            var pb = b.GetPixels32();
+            int changed = 0;
+            for (int i = 0; i < pa.Length; i++)
+                if (Math.Abs(pa[i].r - pb[i].r) > threshold || Math.Abs(pa[i].g - pb[i].g) > threshold || Math.Abs(pa[i].b - pb[i].b) > threshold) changed++;
+            UnityEngine.Object.DestroyImmediate(a);
+            UnityEngine.Object.DestroyImmediate(b);
+            return changed;
         }
 
         static string ArgValue(string name)

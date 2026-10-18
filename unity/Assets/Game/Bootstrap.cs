@@ -14,19 +14,13 @@ namespace Rats.Game
     /// Practice / host: this machine runs the sim. Fighter 1 is the bot, or the remote player once one joins.
     /// Client: this machine runs no sim; it sends keyboard input and shows the host's snapshots as fighter 1.
     ///
-    /// Keys: WASD move, J melee, K ranged, Space dash, Tab lock-on, Q/E orbit (unlocked),
-    /// Enter restart round, F5 reload tunables.txt and restart (both host/practice only), Esc multiplayer menu.
+    /// Keys: WASD move, J melee, K ranged, Space dash, Tab lock-on, 1-3 draft, Q/E orbit (unlocked), Enter new match,
+    /// F5 reload tunables.txt + visuals.txt and restart (both host/practice only), F9 save replay, F1 debug overlay, Esc menu.
     /// </summary>
     public sealed class Bootstrap : MonoBehaviour
     {
-        static readonly Color SandColor = new Color(0.66f, 0.56f, 0.40f);
-        static readonly Color StoneColor = new Color(0.42f, 0.40f, 0.37f);
-        static readonly Color OutsideColor = new Color(0.22f, 0.20f, 0.18f);
-        static readonly Color SkyColor = new Color(0.30f, 0.28f, 0.26f);
         static readonly Color[] FighterColors = { new Color(0.65f, 0.25f, 0.18f), new Color(0.2f, 0.35f, 0.6f) };
         static readonly string[] FighterColorNames = { "red", "blue" };
-        const int WallSegments = 72;
-        const float WallHeight = 0.8f, WallThickness = 0.5f, PillarHeight = 4f;
 
         public Simulation Sim { get; private set; }
         public Camera Camera => cameraRig.Camera;
@@ -38,6 +32,12 @@ namespace Rats.Game
         readonly HashSet<int> seen = new HashSet<int>();
         readonly CharacterView[] fighters = new CharacterView[2];
         Feedback feedback;
+        Effects effects;
+        Hud hud;
+        RetroEffect retro;
+        Camera uiCamera;
+        VisualSettings look;
+        bool showDebug;
         KeyboardInput keyboard;
         CameraRig cameraRig;
         Transform world;
@@ -94,7 +94,8 @@ namespace Rats.Game
             localIndex = local;
 
             Sim = new Simulation(tunables, (ulong)DateTime.Now.Ticks); // fresh draft draws every round; replays store the seed
-            BuildArena(Sim.Arena);
+            look = VisualSettings.Load();
+            ArenaView.Build(world, Sim.Arena, look);
 
             for (int i = 0; i < 2; i++)
             {
@@ -103,15 +104,29 @@ namespace Rats.Game
                 fighters[i].Build(FighterColors[i], i == localIndex ? 0 : tunables.ActionPointsPerTurn); // pips over the opponent only
             }
 
+            int uiLayer = LayerMask.NameToLayer("UI");
             var cam = new GameObject("Camera").AddComponent<Camera>();
             cam.transform.SetParent(world, false);
             cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.backgroundColor = SkyColor;
+            cam.backgroundColor = new Color(0.62f, 0.42f, 0.30f);
             cam.fieldOfView = 55f;
+            cam.farClipPlane = 1000f;
+            cam.cullingMask = ~(1 << uiLayer);
+            retro = cam.gameObject.AddComponent<RetroEffect>();
+            retro.Look = look;
             cameraRig = new CameraRig(cam);
-            feedback = new Feedback(cameraRig, fighters);
+
+            // The HUD gets its own camera so the retro effect leaves text crisp.
+            uiCamera = new GameObject("UICamera").AddComponent<Camera>();
+            uiCamera.transform.SetParent(world, false);
+            uiCamera.clearFlags = CameraClearFlags.Depth;
+            uiCamera.cullingMask = 1 << uiLayer;
+            uiCamera.depth = 10;
 
             keyboard = new KeyboardInput(cam.transform);
+            hud = new Hud(world, cam, uiCamera) { OnPickDraft = keyboard.ChooseDraft };
+            effects = new Effects(world, look);
+            feedback = new Feedback(cameraRig, fighters, hud, effects, look);
             Inputs[localIndex] = keyboard;
             Inputs[1 - localIndex] = null;
 
@@ -137,6 +152,7 @@ namespace Rats.Game
         void Update()
         {
             if (Input.GetKeyDown(KeyCode.Escape)) menuOpen = !menuOpen;
+            if (Input.GetKeyDown(KeyCode.F1)) showDebug = !showDebug;
             keyboard.Enabled = !menuOpen;
             PollNetwork();
             if (isClient) UpdateClient();
@@ -321,69 +337,40 @@ namespace Rats.Game
                     view = Primitives.Create(PrimitiveType.Sphere, world, new Color(1f, 0.45f, 0.1f));
                     view.name = $"Projectile {p.Id}";
                     view.transform.localScale = Vector3.one * (float)(p.Radius * 2);
+                    var trail = view.AddComponent<TrailRenderer>();
+                    trail.time = 0.18f;
+                    trail.widthMultiplier = (float)(p.Radius * 0.9);
+                    trail.sharedMaterial = new Material(Shader.Find("Sprites/Default"));
+                    trail.startColor = new Color(1f, 0.6f, 0.2f, 0.8f);
+                    trail.endColor = new Color(1f, 0.4f, 0.1f, 0f);
                     projectileViews[p.Id] = view;
                 }
                 view.transform.position = SimConvert.ToUnity(p.Position);
+                view.GetComponent<TrailRenderer>().time = Sim.IsFrozen ? 1e6f : 0.18f; // the trail holds still while time is frozen
             }
             var gone = new List<int>();
             foreach (var id in projectileViews.Keys) if (!seen.Contains(id)) gone.Add(id);
             foreach (var id in gone) { DestroyImmediate(projectileViews[id]); projectileViews.Remove(id); }
 
             feedback.Sync(Sim, localIndex);
+            effects.Sync(Sim);
+            float freezeTarget = Sim.IsFrozen ? 1f : 0f;
+            retro.Freeze = snapCamera ? freezeTarget : Mathf.MoveTowards(retro.Freeze, freezeTarget, deltaTime * 5f);
             cameraRig.Update(Sim.Fighters[localIndex], Sim.Fighters[1 - localIndex], deltaTime, snapCamera);
             for (int i = 0; i < 2; i++) fighters[i].Sync(Sim.Fighters[i], Sim.T, Camera.transform.rotation);
+            hud.Sync(Sim, localIndex, Online ? "Opponent" : "Bot", isClient);
         }
 
-        void BuildArena(Arena arena)
+        /// <summary>Renders the world camera then the HUD camera into a texture (used by the headless capture).</summary>
+        public void RenderAll(RenderTexture target)
         {
-            var sun = new GameObject("Sun").AddComponent<Light>();
-            sun.transform.SetParent(world, false);
-            sun.type = LightType.Directional;
-            sun.shadows = LightShadows.Soft;
-            sun.intensity = 1.1f;
-            sun.color = new Color(1f, 0.93f, 0.8f);
-            sun.transform.rotation = Quaternion.Euler(55f, -35f, 0f);
-            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.36f, 0.33f, 0.30f);
-            RenderSettings.fog = true;
-            RenderSettings.fogMode = FogMode.Linear;
-            RenderSettings.fogColor = SkyColor;
-            RenderSettings.fogStartDistance = 25f;
-            RenderSettings.fogEndDistance = 70f;
-
-            var outside = Primitives.Create(PrimitiveType.Plane, world, OutsideColor);
-            outside.name = "Outside";
-            outside.transform.localPosition = new Vector3(0f, -0.02f, 0f);
-            outside.transform.localScale = new Vector3(20f, 1f, 20f);
-
-            var sand = Primitives.Create(PrimitiveType.Cylinder, world, SandColor);
-            sand.name = "Sand";
-            sand.transform.localScale = new Vector3((float)arena.RadiusX * 2f, 0.01f, (float)arena.RadiusZ * 2f);
-
-            for (int i = 0; i < WallSegments; i++)
+            Canvas.ForceUpdateCanvases();
+            foreach (var cam in new[] { Camera, uiCamera })
             {
-                var a = EllipsePoint(arena, i, WallThickness * 0.5f);
-                var b = EllipsePoint(arena, i + 1, WallThickness * 0.5f);
-                var wall = Primitives.Create(PrimitiveType.Cube, world, StoneColor);
-                wall.name = $"Wall {i}";
-                wall.transform.localPosition = (a + b) * 0.5f + Vector3.up * (WallHeight * 0.5f);
-                wall.transform.localRotation = Quaternion.LookRotation(b - a, Vector3.up);
-                wall.transform.localScale = new Vector3(WallThickness, WallHeight, Vector3.Distance(a, b) + 0.05f);
+                cam.targetTexture = target;
+                cam.Render();
+                cam.targetTexture = null;
             }
-
-            foreach (var c in arena.Pillars)
-            {
-                var pillar = Primitives.Create(PrimitiveType.Cylinder, world, StoneColor * 1.15f);
-                pillar.name = "Pillar";
-                pillar.transform.localPosition = SimConvert.ToUnity(c) + Vector3.up * (PillarHeight * 0.5f);
-                pillar.transform.localScale = new Vector3((float)arena.PillarRadius * 2f, PillarHeight * 0.5f, (float)arena.PillarRadius * 2f);
-            }
-        }
-
-        static Vector3 EllipsePoint(Arena arena, int i, float outset)
-        {
-            float angle = i * Mathf.PI * 2f / WallSegments;
-            return new Vector3(Mathf.Cos(angle) * ((float)arena.RadiusX + outset), 0f, Mathf.Sin(angle) * ((float)arena.RadiusZ + outset));
         }
 
         // --- Overlay and menu -------------------------------------------------------------
@@ -399,8 +386,16 @@ namespace Rats.Game
             string phase = Sim.Phase == Phase.Combat ? $"COMBAT  {Sim.PhaseTicksLeft / 60f:F1}s"
                          : Sim.Phase == Phase.Freeze ? $"FROZEN  {Sim.PhaseTicksLeft / 60f:F1}s"
                          : Sim.Phase == Phase.RoundOver ? "ROUND OVER" : "MATCH OVER";
+            if (tunablesError != null) GUI.Label(new Rect(12, Screen.height - 60, 900, 24), tunablesError);
+            if (look?.Error != null) GUI.Label(new Rect(12, Screen.height - 40, 900, 24), look.Error);
+            if (replayMessage != null && Time.unscaledTime < replayMessageUntil) GUI.Label(new Rect(12, Screen.height - 20, 900, 24), replayMessage);
+            if (menuOpen) DrawMenu();
+            if (!showDebug) return;
+
+            // F1 debug overlay (the HUD is the player-facing view).
             string restartKeys = isClient ? "" : "  Enter restart  F5 reload tunables  F9 save replay";
-            GUI.Label(new Rect(12, 8, 900, 140),
+            GUI.Box(new Rect(8, 100, 760, 140), GUIContent.none);
+            GUI.Label(new Rect(16, 104, 900, 140),
                 $"Turn {Sim.Turn}   {phase}\n" +
                 $"tick {Sim.Tick}   combat tick {Sim.CombatTick}\n" +
                 $"You ({FighterColorNames[localIndex]})  HP {me.Hp}/{me.MaxHp}  AP {me.ActionPoints}  {(me.LockedOn ? "LOCKED" : "free")}   {Describe(me)}\n" +
@@ -409,38 +404,6 @@ namespace Rats.Game
                 $"{themName} hits: melee {Sim.HitDamage(them, ActionKind.Melee, me)} / ranged {Sim.HitDamage(them, ActionKind.Ranged, me)}   Upgrades: {Owned(them)}\n" +
                 $"WASD move  J melee  K ranged  Space dash  Tab lock  Q/E orbit{restartKeys}  Esc multiplayer\n" +
                 NetStatusLine());
-            if (tunablesError != null) GUI.Label(new Rect(12, 150, 900, 40), tunablesError);
-            if (replayMessage != null && Time.unscaledTime < replayMessageUntil) GUI.Label(new Rect(12, 170, 900, 40), replayMessage);
-
-            feedback.Draw(Sim, Camera);
-            DrawMatchStatus(themName);
-
-            if (Sim.DraftActive && Sim.Phase == Phase.Freeze) DrawDraft(me, them);
-            if (menuOpen) DrawMenu();
-        }
-
-        /// <summary>Round and score at the top, plus round/match result banners.</summary>
-        void DrawMatchStatus(string themName)
-        {
-            var top = new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-            GUI.Label(new Rect(0, 4, Screen.width, 30), $"ROUND {Sim.Round}     You {Sim.Score(localIndex)} - {Sim.Score(1 - localIndex)} {themName}", top);
-
-            if (Sim.Phase != Phase.RoundOver && Sim.Phase != Phase.MatchOver) return;
-            var big = new GUIStyle(GUI.skin.label) { fontSize = 44, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-            var small = new GUIStyle(GUI.skin.label) { fontSize = 18, alignment = TextAnchor.MiddleCenter };
-            string theirs = Online ? "OPPONENT" : "BOT";
-            if (Sim.Phase == Phase.RoundOver)
-            {
-                string result = Sim.Winner == Simulation.Draw ? "DRAW - ROUND REPLAYED" : Sim.Winner == localIndex ? "ROUND TO YOU" : $"ROUND TO {theirs}";
-                GUI.Label(new Rect(0, Screen.height * 0.33f, Screen.width, 60), result, big);
-                GUI.Label(new Rect(0, Screen.height * 0.33f + 58, Screen.width, 30), $"Next round in {Sim.PhaseTicksLeft / 60f:F1}s", small);
-            }
-            else
-            {
-                string result = Sim.MatchWinner == localIndex ? "YOU WIN THE MATCH" : $"{theirs} WINS THE MATCH";
-                GUI.Label(new Rect(0, Screen.height * 0.33f, Screen.width, 60), $"{result}  {Sim.Score(localIndex)}-{Sim.Score(1 - localIndex)}", big);
-                GUI.Label(new Rect(0, Screen.height * 0.33f + 58, Screen.width, 30), isClient ? "Waiting for the host to start a new match" : "Enter for a new match", small);
-            }
         }
 
         string NetStatusLine()
@@ -496,29 +459,6 @@ namespace Rats.Game
             var names = new List<string>();
             foreach (var u in Upgrades.Pool) if (f.Has(u)) names.Add(Upgrades.Name(u));
             return names.Count == 0 ? "none" : string.Join(", ", names);
-        }
-
-        /// <summary>Draft screen: your own 3 offers (the opponent's are hidden); keys 1-3 or click. Picks apply when the freeze ends.</summary>
-        void DrawDraft(Fighter me, Fighter them)
-        {
-            const float w = 620, h = 300;
-            GUILayout.BeginArea(new Rect((Screen.width - w) / 2, Screen.height - h - 20, w, h), GUI.skin.box);
-            GUILayout.Label($"DRAFT {Sim.DraftsThisRound}/{Sim.T.DraftsPerRound}: pick one (keys 1-3 or click)    {Sim.PhaseTicksLeft / 60f:F1}s");
-            GUILayout.Label(isClient || Online ? (them.DraftPick != 0 ? "Opponent has picked." : "Opponent is choosing...")
-                                               : (them.DraftPick != 0 ? "Bot has picked." : "Bot is choosing..."));
-            for (int slot = 0; slot < 3; slot++)
-            {
-                int offer = Simulation.Offer(me, slot);
-                if (offer == Simulation.NoOffer) continue;
-                var u = (UpgradeId)offer;
-                string state = me.DraftPick == offer + 1 ? "  <- YOUR PICK" : "";
-                GUI.enabled = me.DraftPick == 0;
-                if (GUILayout.Button($"[{slot + 1}] {Upgrades.Name(u)}{state}\n{Upgrades.Describe(u, Sim.T)}", GUILayout.Height(58)))
-                    keyboard.ChooseDraft(slot + 1);
-                GUI.enabled = true;
-            }
-            GUILayout.Label(me.DraftPick == 0 ? "No pick when the timer ends = your first offer. Your opponent has their own 3." : "Locked in. Applies when time resumes.");
-            GUILayout.EndArea();
         }
 
         string Describe(Fighter f)

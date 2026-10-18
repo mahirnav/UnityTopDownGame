@@ -37,7 +37,8 @@ Open `unity/` in Unity Hub (6000.3.26f1). The Bootstrap scene opens automaticall
 
 Keys: WASD move · J melee · K ranged · Space dash · Tab lock-on · 1-3 pick an upgrade during a draft · Q/E orbit (unlocked) · Enter restart · F5 reload tunables · F9 save replay.
 
-Tune numbers in `unity/Assets/StreamingAssets/tunables.txt`, save, press F5.
+Tune gameplay numbers in `unity/Assets/StreamingAssets/tunables.txt` and the look (PS2 pixel size, color banding,
+dither, fog, crowd, shake) in `visuals.txt`; save, press F5. F1 shows the debug overlay.
 
 ## Play online (1v1)
 

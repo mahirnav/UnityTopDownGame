@@ -27,7 +27,7 @@ namespace Rats.Game
         float flinchUntil;
 
         /// <summary>Brief recoil when hit (visual only).</summary>
-        public void Flinch() => flinchUntil = Time.unscaledTime + 0.15f;
+        public void Flinch() => flinchUntil = Time.realtimeSinceStartup + 0.15f;
 
         public void Build(Color color, int pipCount)
         {
@@ -72,12 +72,12 @@ namespace Rats.Game
                      : fighter.Action == ActionKind.Melee ? Mathf.Sin(progress * Mathf.PI) * 35f
                      : 0f;
             }
-            if (Time.unscaledTime < flinchUntil) lean -= 18f;
+            if (Time.realtimeSinceStartup < flinchUntil) lean -= 18f;
             body.localRotation *= Quaternion.Euler(lean, 0f, 0f);
 
-            if (fighter.Hp < lastHp && lastHp != int.MaxValue) flashUntil = Time.unscaledTime + HitFlashSeconds;
+            if (fighter.Hp < lastHp && lastHp != int.MaxValue) flashUntil = Time.realtimeSinceStartup + HitFlashSeconds;
             lastHp = fighter.Hp;
-            if (Time.unscaledTime < flashUntil) color = Color.white; // visual only, never feeds back into the sim
+            if (Time.realtimeSinceStartup < flashUntil) color = Color.white; // visual only, never feeds back into the sim
             bodyRenderer.sharedMaterial.color = color;
 
             pipRoot.rotation = cameraRotation; // pips line up across the screen

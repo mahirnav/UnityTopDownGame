@@ -36,21 +36,29 @@ namespace Rats.EditorTools
         }
 
         /// <summary>
-        /// The world is built in code, so no scene or asset references the Standard shader or uses fog,
-        /// and the build strips both (magenta objects, no fog). Keep them explicitly.
+        /// The world is built in code, so no scene or asset references these shaders and builds would strip
+        /// them (magenta objects), along with fog. Keep them explicitly. Add any shader new code uses here.
         /// </summary>
+        static readonly string[] CodeOnlyShaders =
+        {
+            "Standard", "Unlit/Color", "Sprites/Default", "UI/Default", "Hidden/RatsRetro",
+            "Legacy Shaders/Particles/Additive", "Legacy Shaders/Particles/Alpha Blended",
+        };
+
         static void IncludeCodeOnlyShaders()
         {
             var settings = new SerializedObject(UnityEngine.Rendering.GraphicsSettings.GetGraphicsSettings());
             var shaders = settings.FindProperty("m_AlwaysIncludedShaders");
-            var standard = Shader.Find("Standard");
-            bool present = false;
-            for (int i = 0; i < shaders.arraySize; i++)
-                if (shaders.GetArrayElementAtIndex(i).objectReferenceValue == standard) present = true;
-            if (!present)
+            foreach (var name in CodeOnlyShaders)
             {
+                var shader = Shader.Find(name);
+                if (shader == null) { Debug.LogError($"[PlayerBuild] shader not found: {name}"); continue; }
+                bool present = false;
+                for (int i = 0; i < shaders.arraySize; i++)
+                    if (shaders.GetArrayElementAtIndex(i).objectReferenceValue == shader) present = true;
+                if (present) continue;
                 shaders.InsertArrayElementAtIndex(shaders.arraySize);
-                shaders.GetArrayElementAtIndex(shaders.arraySize - 1).objectReferenceValue = standard;
+                shaders.GetArrayElementAtIndex(shaders.arraySize - 1).objectReferenceValue = shader;
             }
             settings.FindProperty("m_FogStripping").intValue = 1; // custom: keep the modes below
             settings.FindProperty("m_FogKeepLinear").boolValue = true;

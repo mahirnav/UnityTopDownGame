@@ -1,7 +1,7 @@
 {
     "name": "Rats.Game",
     "rootNamespace": "Rats.Game",
-    "references": ["Rats.Sim"],
+    "references": ["Rats.Sim", "UnityEngine.UI"],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
