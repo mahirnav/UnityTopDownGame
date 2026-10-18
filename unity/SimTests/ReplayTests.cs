@@ -26,10 +26,10 @@ namespace Rats.SimTests
         [Test]
         public void RecordingSurvivesTheFileAndReplaysExactly()
         {
-            var sim = new Simulation(new Tunables { TurnTicks = 240, FreezeTicks = 60 });
+            var sim = new Simulation(new Tunables { TurnTicks = 240, FreezeTicks = 60 }, seed: 12345); // drafting on
             var bot0 = new SimpleBot(sim, 0, 7);
             var bot1 = new SimpleBot(sim, 1, 8);
-            var rec = new MatchRecording(sim.T) { Note = "test" };
+            var rec = new MatchRecording(sim.T, sim.Seed) { Note = "test" };
             for (int i = 0; i < 2500 && sim.Phase != Phase.RoundOver; i++)
             {
                 var a = bot0.Read(sim.Tick);

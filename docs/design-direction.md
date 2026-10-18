@@ -10,6 +10,7 @@ Where the game is heading, from Nick's design discussions. Three levels, and the
   abilities come after P1 is played.
 - **P1 pool (8):** Heavy Blade, Long Reach, Big Bolt, Fortification, Free Step, Opening Move, Exhaustion Punish,
   Carry the Flame. Overclock was cut. Details in `docs/upgrades.md`.
+- **P1 is built:** drafting on the 1st/3rd/5th freeze (5 s), same 3 offers for both, keys 1-3, picks apply when the freeze ends, no pick = first offer you don't own. Damage is read when a hit lands, so frozen attacks get upgrades picked during the freeze.
 - **Facing:** an action's direction stays where it started (for now; see the facing model under Leaning).
 - **Startup walking and lock-on grace** exist as tunables, default off, to A/B in playtests.
 - **Online:** host-authoritative direct connection over Tailscale now; real matchmaking later.

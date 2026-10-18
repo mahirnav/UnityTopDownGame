@@ -60,7 +60,7 @@ namespace Rats.Game
             var color = baseColor;
             if (fighter.IsBusy)
             {
-                var def = t.Get(fighter.Action);
+                var def = fighter.Frames; // locked when the action started
                 int tick = fighter.ActionTick;
                 color = tick < def.Startup ? StartupColor : def.IsActive(tick) ? ActiveColor : RecoveryColor;
                 float progress = (float)tick / def.Total;

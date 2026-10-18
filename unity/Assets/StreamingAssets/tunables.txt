@@ -50,3 +50,18 @@ PillarRadius = 0.9
 PillarOffsetX = 5.5         # 4 pillars at (+-X, +-Z)
 PillarOffsetZ = 4
 StartOffsetX = 9            # fighters start at (-X, 0) and (+X, 0)
+
+# --- Drafting (P1) ---
+DraftsPerRound = 3          # upgrade drafts per round
+DraftInterval = 2           # draft on every Nth freeze, starting with the first (1 = every freeze)
+DraftFreezeTicks = 300      # draft freezes last 5 s; plain freezes use FreezeTicks
+
+# --- Upgrades ---
+HeavyBladeDamage = 8
+LongReachBonus = 0.6
+BigBoltRadiusMultiplier = 2
+FortificationMaxHp = 25
+FortificationHeal = 10
+OpeningMoveStartupPercent = 50    # first action's startup becomes 50% of normal
+ExhaustionPunishPercent = 20      # +20% damage vs a target with 0 action points
+CarryTheFlameDamagePerPoint = 2   # per unspent point, per hit, next turn

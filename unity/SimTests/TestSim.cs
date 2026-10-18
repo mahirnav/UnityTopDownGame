@@ -7,11 +7,11 @@ namespace Rats.SimTests
     {
         public static readonly IInputSource Idle = new ScriptedInput();
 
-        public static Simulation Create(System.Action<Tunables> tweak = null)
+        public static Simulation Create(System.Action<Tunables> tweak = null, ulong seed = 1)
         {
-            var t = new Tunables();
+            var t = new Tunables { DraftsPerRound = 0 }; // drafting off unless a test turns it on
             tweak?.Invoke(t);
-            return new Simulation(t);
+            return new Simulation(t, seed);
         }
 
         /// <summary>Places fighters directly, facing each other, for close-range scenarios.</summary>

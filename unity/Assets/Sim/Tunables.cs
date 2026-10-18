@@ -65,6 +65,21 @@ namespace Rats.Sim
         public double PillarOffsetZ = 4;
         public double StartOffsetX = 9;        // fighters start at (-X, 0) and (+X, 0)
 
+        // Drafting (P1): offers appear during some freezes; picks apply when the freeze ends
+        public int DraftsPerRound = 3;
+        public int DraftInterval = 2;          // draft on every Nth freeze, starting with the first
+        public int DraftFreezeTicks = 300;     // draft freezes last longer (5 s) than plain ones
+
+        // Upgrades
+        public int HeavyBladeDamage = 8;
+        public double LongReachBonus = 0.6;    // m
+        public double BigBoltRadiusMultiplier = 2;
+        public int FortificationMaxHp = 25;
+        public int FortificationHeal = 10;
+        public int OpeningMoveStartupPercent = 50;   // first action's startup becomes this % of normal
+        public int ExhaustionPunishPercent = 20;     // bonus damage vs a target with 0 action points
+        public int CarryTheFlameDamagePerPoint = 2;  // per unspent point, per hit, for the next turn
+
         public ActionDef Melee => new ActionDef(MeleeCost, MeleeStartup, MeleeActive, MeleeRecovery);
         public ActionDef Dash => new ActionDef(DashCost, DashStartup, DashActive, DashRecovery);
         public ActionDef Ranged => new ActionDef(RangedCost, RangedStartup, RangedActive, RangedRecovery);
@@ -147,6 +162,7 @@ namespace Rats.Sim
         }
 
         public int Total => Startup + Active + Recovery;
+        public ActionDef WithStartup(int startup) => new ActionDef(Cost, startup, Active, Recovery);
         public bool IsActive(int actionTick) => actionTick >= Startup && actionTick < Startup + Active;
     }
 }

@@ -34,7 +34,7 @@ Read `CLAUDE.md` for the architecture rules (also what Claude Code follows).
 
 Open `unity/` in Unity Hub (6000.3.26f1). The Bootstrap scene opens automatically. Press Play.
 
-Keys: WASD move · J melee · K ranged · Space dash · Tab lock-on · Q/E orbit (unlocked) · Enter restart · F5 reload tunables.
+Keys: WASD move · J melee · K ranged · Space dash · Tab lock-on · 1-3 pick an upgrade during a draft · Q/E orbit (unlocked) · Enter restart · F5 reload tunables · F9 save replay.
 
 Tune numbers in `unity/Assets/StreamingAssets/tunables.txt`, save, press F5.
 

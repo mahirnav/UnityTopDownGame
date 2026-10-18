@@ -14,10 +14,15 @@ namespace Rats.Sim
         public Vec3 Position;
         public Vec3 Facing;
         public int Hp;
+        public int MaxHp;
         public int ActionPoints;
         public ActionKind Action;
         /// <summary>Ticks elapsed in the current action (0 on the tick it starts).</summary>
         public int ActionTick;
+        /// <summary>Frame data locked when the current action started (upgrades picked later don't change it).</summary>
+        public ActionDef Frames;
+        /// <summary>Melee reach locked when the swing started.</summary>
+        public double ActionReach;
         public Vec3 ActionDir;
         public bool ActionHitLanded;
         public bool LockedOn;
@@ -26,9 +31,19 @@ namespace Rats.Sim
         /// <summary>Ticks left in which lock comes back on its own if the opponent reappears (0 = none).</summary>
         public int RelockWindowTicks;
 
+        /// <summary>One bit per UpgradeId owned this round.</summary>
+        public ulong Upgrades;
+        public int ActionsThisTurn;
+        public bool FreeDashUsed;
+        /// <summary>Carry the Flame: points left unspent at the end of the previous turn.</summary>
+        public int CarriedPoints;
+        /// <summary>Pick locked in during the current draft: UpgradeId + 1, or 0 for none yet.</summary>
+        public int DraftPick;
+
         public Fighter(int index) { Index = index; }
 
         public bool IsBusy => Action != ActionKind.None;
+        public bool Has(UpgradeId u) => (Upgrades & (1UL << (int)u)) != 0;
     }
 
     public sealed class Projectile
@@ -37,6 +52,8 @@ namespace Rats.Sim
         public int Owner;
         public Vec3 Position;
         public Vec3 Velocity;
+        /// <summary>Locked when fired (Big Bolt).</summary>
+        public double Radius;
         public int AgeTicks;
     }
 
@@ -55,15 +72,21 @@ namespace Rats.Sim
     /// <summary>
     /// The combat simulation. Owns all gameplay state and only changes it in Step().
     /// Nothing here reads engine time, physics, animation, or local input.
+    ///
+    /// Upgrade rule: values are either read when a hit lands (damage, so a frozen swing benefits from a
+    /// pick made during the freeze) or locked when an action starts (frame data, reach, bolt size).
     /// </summary>
     public sealed class Simulation
     {
         public const int NoWinner = -1;
         public const int Draw = 2;
-        const int SnapshotVersion = 3; // 2: doubles, 3: lock-on timers
+        public const int NoOffer = -1;
+        const int SnapshotVersion = 4; // 2: doubles, 3: lock-on timers, 4: upgrades and drafting
 
         public readonly Tunables T;
         public readonly Arena Arena;
+        /// <summary>Seed for the draft draws; replays and tests reproduce a match from tunables + seed + inputs.</summary>
+        public readonly ulong Seed;
         public readonly Fighter[] Fighters = { new Fighter(0), new Fighter(1) };
         public readonly List<Projectile> Projectiles = new List<Projectile>();
         public readonly List<ActionEvent> ActionLog = new List<ActionEvent>();
@@ -76,18 +99,27 @@ namespace Rats.Sim
         public Phase Phase { get; private set; }
         public int PhaseTicksLeft { get; private set; }
         public int Winner { get; private set; } = NoWinner;
+        /// <summary>True during a freeze that offers upgrades.</summary>
+        public bool DraftActive { get; private set; }
+        public int DraftsThisRound { get; private set; }
+        int freezesThisRound;
+        int offer0 = NoOffer, offer1 = NoOffer, offer2 = NoOffer;
+        ulong rng;
         int nextProjectileId = 1;
 
-        public Simulation(Tunables tunables)
+        public Simulation(Tunables tunables, ulong seed = 1)
         {
             T = tunables;
             Arena = new Arena(tunables);
+            Seed = seed;
+            rng = seed != 0 ? seed : 0x9E3779B97F4A7C15UL; // xorshift state must not be zero
             for (int i = 0; i < 2; i++)
             {
                 var f = Fighters[i];
                 double side = i == 0 ? -1 : 1;
                 f.Position = new Vec3(side * T.StartOffsetX, 0, 0);
                 f.Facing = new Vec3(-side, 0, 0);
+                f.MaxHp = T.MaxHp;
                 f.Hp = T.MaxHp;
                 f.LockedOn = true;
             }
@@ -97,8 +129,11 @@ namespace Rats.Sim
         public bool IsFrozen => Phase == Phase.Freeze;
         public Fighter Opponent(Fighter f) => Fighters[1 - f.Index];
 
+        /// <summary>Offer slot 0-2 of the current draft as an UpgradeId, or NoOffer.</summary>
+        public int Offer(int slot) => slot == 0 ? offer0 : slot == 1 ? offer1 : slot == 2 ? offer2 : NoOffer;
+
         /// <summary>
-        /// Advances one tick. In Freeze only the freeze timer moves; gameplay state is untouched.
+        /// Advances one tick. In Freeze only the freeze timer (and draft picks) move; gameplay state is untouched.
         /// Order: inputs -> action starts -> movement -> collisions -> damage -> down checks -> action progress / turn timer.
         /// </summary>
         public void Step(InputFrame input0, InputFrame input1)
@@ -107,7 +142,16 @@ namespace Rats.Sim
             Tick++;
             if (Phase == Phase.Freeze)
             {
-                if (--PhaseTicksLeft <= 0) StartTurn();
+                if (DraftActive)
+                {
+                    TakeDraftPick(Fighters[0], input0);
+                    TakeDraftPick(Fighters[1], input1);
+                }
+                if (--PhaseTicksLeft <= 0)
+                {
+                    if (DraftActive) ApplyDraftPicks(); // both at once, never at pick time
+                    StartTurn();
+                }
                 return;
             }
 
@@ -115,7 +159,7 @@ namespace Rats.Sim
             HandleInput(Fighters[0], input0);
             HandleInput(Fighters[1], input1);
             foreach (var f in Fighters)
-                if (f.Action == ActionKind.Ranged && f.ActionTick == T.RangedStartup) SpawnProjectile(f);
+                if (f.Action == ActionKind.Ranged && f.ActionTick == f.Frames.Startup) SpawnProjectile(f);
 
             // Movement
             Move(Fighters[0], input0);
@@ -129,8 +173,8 @@ namespace Rats.Sim
             // Collisions
             SeparateFighters();
             Projectiles.RemoveAll(p => p.AgeTicks >= T.ProjectileLifetimeTicks
-                                       || !Arena.Inside(p.Position, T.ProjectileRadius)
-                                       || Arena.HitsPillar(p.Position, T.ProjectileRadius));
+                                       || !Arena.Inside(p.Position, p.Radius)
+                                       || Arena.HitsPillar(p.Position, p.Radius));
             foreach (var f in Fighters) UpdateLockOn(f);
 
             // Damage
@@ -153,17 +197,52 @@ namespace Rats.Sim
             if (--PhaseTicksLeft <= 0) EndTurn();
         }
 
+        /// <summary>Damage a hit from this attacker deals right now. Read at the moment of impact.</summary>
+        public int HitDamage(Fighter attacker, ActionKind kind, Fighter target)
+        {
+            int damage = kind == ActionKind.Melee
+                ? T.MeleeDamage + (attacker.Has(UpgradeId.HeavyBlade) ? T.HeavyBladeDamage : 0)
+                : T.RangedDamage;
+            damage += attacker.CarriedPoints * T.CarryTheFlameDamagePerPoint;
+            if (attacker.Has(UpgradeId.ExhaustionPunish) && target.ActionPoints == 0)
+                damage = damage * (100 + T.ExhaustionPunishPercent) / 100;
+            return damage;
+        }
+
         void StartTurn()
         {
             Turn++;
             Phase = Phase.Combat;
             PhaseTicksLeft = T.TurnTicks;
-            foreach (var f in Fighters) f.ActionPoints = T.ActionPointsPerTurn;
+            DraftActive = false;
+            foreach (var f in Fighters)
+            {
+                f.ActionPoints = T.ActionPointsPerTurn;
+                f.ActionsThisTurn = 0;
+                f.FreeDashUsed = false;
+            }
         }
 
         void EndTurn()
         {
-            foreach (var f in Fighters) f.ActionPoints = 0; // unspent points expire
+            foreach (var f in Fighters)
+            {
+                f.CarriedPoints = f.Has(UpgradeId.CarryTheFlame) ? f.ActionPoints : 0;
+                f.ActionPoints = 0; // unspent points expire
+            }
+            freezesThisRound++;
+
+            bool draft = DraftsThisRound < T.DraftsPerRound && T.DraftInterval > 0
+                         && (freezesThisRound - 1) % T.DraftInterval == 0;
+            if (draft)
+            {
+                RollOffers();
+                DraftActive = true;
+                DraftsThisRound++;
+                Phase = Phase.Freeze;
+                PhaseTicksLeft = Math.Max(1, T.DraftFreezeTicks);
+                return;
+            }
             if (T.FreezeTicks <= 0)
             {
                 StartTurn();
@@ -172,6 +251,77 @@ namespace Rats.Sim
             Phase = Phase.Freeze;
             PhaseTicksLeft = T.FreezeTicks;
         }
+
+        // --- Drafting -------------------------------------------------------------------
+
+        /// <summary>Mirrored offers: 3 distinct upgrades that at least one fighter doesn't own yet.</summary>
+        void RollOffers()
+        {
+            var candidates = new List<int>();
+            foreach (var u in Upgrades.Pool)
+                if (!(Fighters[0].Has(u) && Fighters[1].Has(u))) candidates.Add((int)u);
+            var picked = new int[3];
+            for (int slot = 0; slot < 3; slot++)
+            {
+                if (candidates.Count == 0) { picked[slot] = NoOffer; continue; }
+                int i = NextInt(candidates.Count);
+                picked[slot] = candidates[i];
+                candidates.RemoveAt(i);
+            }
+            offer0 = picked[0]; offer1 = picked[1]; offer2 = picked[2];
+            foreach (var f in Fighters) f.DraftPick = 0;
+        }
+
+        /// <summary>First valid pick locks in; picks of an upgrade you already own are ignored.</summary>
+        void TakeDraftPick(Fighter f, InputFrame input)
+        {
+            if (f.DraftPick != 0 || input.DraftPick < 1 || input.DraftPick > 3) return;
+            int offer = Offer(input.DraftPick - 1);
+            if (offer == NoOffer || f.Has((UpgradeId)offer)) return;
+            f.DraftPick = offer + 1;
+        }
+
+        void ApplyDraftPicks()
+        {
+            foreach (var f in Fighters)
+            {
+                int chosen = f.DraftPick > 0 ? f.DraftPick - 1 : FirstValidOffer(f); // no pick in time: first valid offer
+                if (chosen != NoOffer) Grant(f, (UpgradeId)chosen);
+                f.DraftPick = 0;
+            }
+            offer0 = offer1 = offer2 = NoOffer;
+        }
+
+        int FirstValidOffer(Fighter f)
+        {
+            for (int slot = 0; slot < 3; slot++)
+            {
+                int offer = Offer(slot);
+                if (offer != NoOffer && !f.Has((UpgradeId)offer)) return offer;
+            }
+            return NoOffer;
+        }
+
+        void Grant(Fighter f, UpgradeId u)
+        {
+            f.Upgrades |= 1UL << (int)u;
+            if (u == UpgradeId.Fortification)
+            {
+                f.MaxHp += T.FortificationMaxHp;
+                f.Hp = Math.Min(f.Hp + T.FortificationHeal, f.MaxHp);
+            }
+        }
+
+        /// <summary>Seeded xorshift64*; the state is part of the snapshot, so draws replay exactly.</summary>
+        int NextInt(int n)
+        {
+            rng ^= rng >> 12;
+            rng ^= rng << 25;
+            rng ^= rng >> 27;
+            return (int)((rng * 2685821657736338717UL) % (ulong)n);
+        }
+
+        // --- Actions --------------------------------------------------------------------
 
         void HandleInput(Fighter f, InputFrame input)
         {
@@ -197,10 +347,20 @@ namespace Rats.Sim
                      : input.Dash ? ActionKind.Dash
                      : ActionKind.None;
             if (kind == ActionKind.None) return;
-            var def = T.Get(kind);
-            if (f.ActionPoints < def.Cost) return;
 
-            f.ActionPoints -= def.Cost; // spent the moment the press is accepted
+            var frames = T.Get(kind);
+            bool freeDash = kind == ActionKind.Dash && f.Has(UpgradeId.FreeStep) && !f.FreeDashUsed;
+            int cost = freeDash ? 0 : frames.Cost;
+            if (f.ActionPoints < cost) return;
+
+            f.ActionPoints -= cost; // spent the moment the press is accepted
+            if (freeDash) f.FreeDashUsed = true;
+            if (f.ActionsThisTurn == 0 && f.Has(UpgradeId.OpeningMove))
+                frames = frames.WithStartup(frames.Startup * T.OpeningMoveStartupPercent / 100);
+            f.Frames = frames;
+            f.ActionReach = T.MeleeRange + (f.Has(UpgradeId.LongReach) ? T.LongReachBonus : 0);
+            f.ActionsThisTurn++;
+
             if (f.LockedOn) f.Facing = FaceToward(f, opponent);
             var move = MoveVector(input);
             f.ActionDir = kind == ActionKind.Dash && move != Vec3.Zero ? move.Normalized : f.Facing;
@@ -215,14 +375,14 @@ namespace Rats.Sim
         {
             if (f.Action == ActionKind.Dash)
             {
-                if (T.Dash.IsActive(f.ActionTick))
+                if (f.Frames.IsActive(f.ActionTick))
                     f.Position = Arena.Constrain(f.Position + f.ActionDir * (T.DashSpeed * Tunables.TickDt), T.FighterRadius);
                 return;
             }
             if (f.IsBusy)
             {
                 // Melee/ranged startup: walk at a fraction of speed (0 = rooted). Facing stays where the action started.
-                if (T.StartupWalkMultiplier > 0 && f.ActionTick < T.Get(f.Action).Startup)
+                if (T.StartupWalkMultiplier > 0 && f.ActionTick < f.Frames.Startup)
                 {
                     var step = MoveVector(input);
                     if (step != Vec3.Zero)
@@ -290,33 +450,35 @@ namespace Rats.Sim
 
         void SpawnProjectile(Fighter f)
         {
+            double radius = T.ProjectileRadius * (f.Has(UpgradeId.BigBolt) ? T.BigBoltRadiusMultiplier : 1);
             Projectiles.Add(new Projectile
             {
                 Id = nextProjectileId++,
                 Owner = f.Index,
-                Position = f.Position + f.ActionDir * (T.FighterRadius + T.ProjectileRadius) + Vec3.Up * T.ProjectileSpawnHeight,
+                Position = f.Position + f.ActionDir * (T.FighterRadius + radius) + Vec3.Up * T.ProjectileSpawnHeight,
                 Velocity = f.ActionDir * T.ProjectileSpeed,
+                Radius = radius,
             });
         }
 
         bool ProjectileHit(Projectile p)
         {
             var target = Fighters[1 - p.Owner];
-            if (Vec3.DistanceXZ(p.Position, target.Position) > T.ProjectileRadius + T.FighterRadius) return false;
-            target.Hp -= T.RangedDamage;
+            if (Vec3.DistanceXZ(p.Position, target.Position) > p.Radius + T.FighterRadius) return false;
+            target.Hp -= HitDamage(Fighters[p.Owner], ActionKind.Ranged, target);
             return true;
         }
 
         void MeleeHit(Fighter f)
         {
-            if (f.Action != ActionKind.Melee || f.ActionHitLanded || !T.Melee.IsActive(f.ActionTick)) return;
+            if (f.Action != ActionKind.Melee || f.ActionHitLanded || !f.Frames.IsActive(f.ActionTick)) return;
             var target = Opponent(f);
             var to = (target.Position - f.Position).Flat;
             double dist = to.Length;
-            if (dist > T.MeleeRange + T.FighterRadius) return;
+            if (dist > f.ActionReach + T.FighterRadius) return;
             double cosHalfArc = Math.Cos(T.MeleeArcDegrees * 0.5 * Math.PI / 180);
             if (dist > 1e-4 && Vec3.Dot(f.Facing, to / dist) < cosHalfArc) return;
-            target.Hp -= T.MeleeDamage;
+            target.Hp -= HitDamage(f, ActionKind.Melee, target);
             f.ActionHitLanded = true;
         }
 
@@ -324,7 +486,7 @@ namespace Rats.Sim
         {
             if (!f.IsBusy) return;
             f.ActionTick++;
-            if (f.ActionTick >= T.Get(f.Action).Total) f.Action = ActionKind.None;
+            if (f.ActionTick >= f.Frames.Total) f.Action = ActionKind.None;
         }
 
         // --- Snapshots: everything a host would send a client. Tunables travel separately. ---
@@ -336,17 +498,22 @@ namespace Rats.Sim
             w.Write(SnapshotVersion);
             w.Write(Tick); w.Write(CombatTick); w.Write(Turn); w.Write((int)Phase);
             w.Write(PhaseTicksLeft); w.Write(Winner); w.Write(nextProjectileId);
+            w.Write(DraftActive); w.Write(DraftsThisRound); w.Write(freezesThisRound);
+            w.Write(offer0); w.Write(offer1); w.Write(offer2); w.Write(rng);
             foreach (var f in Fighters)
             {
                 Write(w, f.Position); Write(w, f.Facing);
-                w.Write(f.Hp); w.Write(f.ActionPoints); w.Write((int)f.Action); w.Write(f.ActionTick);
+                w.Write(f.Hp); w.Write(f.MaxHp); w.Write(f.ActionPoints); w.Write((int)f.Action); w.Write(f.ActionTick);
+                w.Write(f.Frames.Cost); w.Write(f.Frames.Startup); w.Write(f.Frames.Active); w.Write(f.Frames.Recovery);
+                w.Write(f.ActionReach);
                 Write(w, f.ActionDir); w.Write(f.ActionHitLanded); w.Write(f.LockedOn);
                 w.Write(f.LockBlockedTicks); w.Write(f.RelockWindowTicks);
+                w.Write(f.Upgrades); w.Write(f.ActionsThisTurn); w.Write(f.FreeDashUsed); w.Write(f.CarriedPoints); w.Write(f.DraftPick);
             }
             w.Write(Projectiles.Count);
             foreach (var p in Projectiles)
             {
-                w.Write(p.Id); w.Write(p.Owner); Write(w, p.Position); Write(w, p.Velocity); w.Write(p.AgeTicks);
+                w.Write(p.Id); w.Write(p.Owner); Write(w, p.Position); Write(w, p.Velocity); w.Write(p.Radius); w.Write(p.AgeTicks);
             }
             w.Flush();
             return ms.ToArray();
@@ -362,26 +529,30 @@ namespace Rats.Sim
         /// <summary>Overwrites this sim's state with a snapshot (a network client does this every update).</summary>
         public void ApplySnapshot(byte[] data)
         {
-            var sim = this;
             using var r = new BinaryReader(new MemoryStream(data));
             int version = r.ReadInt32();
             if (version != SnapshotVersion) throw new InvalidDataException($"snapshot version {version}, expected {SnapshotVersion}");
-            sim.Tick = r.ReadInt32(); sim.CombatTick = r.ReadInt32(); sim.Turn = r.ReadInt32(); sim.Phase = (Phase)r.ReadInt32();
-            sim.PhaseTicksLeft = r.ReadInt32(); sim.Winner = r.ReadInt32(); sim.nextProjectileId = r.ReadInt32();
-            foreach (var f in sim.Fighters)
+            Tick = r.ReadInt32(); CombatTick = r.ReadInt32(); Turn = r.ReadInt32(); Phase = (Phase)r.ReadInt32();
+            PhaseTicksLeft = r.ReadInt32(); Winner = r.ReadInt32(); nextProjectileId = r.ReadInt32();
+            DraftActive = r.ReadBoolean(); DraftsThisRound = r.ReadInt32(); freezesThisRound = r.ReadInt32();
+            offer0 = r.ReadInt32(); offer1 = r.ReadInt32(); offer2 = r.ReadInt32(); rng = r.ReadUInt64();
+            foreach (var f in Fighters)
             {
                 f.Position = ReadVec(r); f.Facing = ReadVec(r);
-                f.Hp = r.ReadInt32(); f.ActionPoints = r.ReadInt32(); f.Action = (ActionKind)r.ReadInt32(); f.ActionTick = r.ReadInt32();
+                f.Hp = r.ReadInt32(); f.MaxHp = r.ReadInt32(); f.ActionPoints = r.ReadInt32(); f.Action = (ActionKind)r.ReadInt32(); f.ActionTick = r.ReadInt32();
+                f.Frames = new ActionDef(r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32());
+                f.ActionReach = r.ReadDouble();
                 f.ActionDir = ReadVec(r); f.ActionHitLanded = r.ReadBoolean(); f.LockedOn = r.ReadBoolean();
                 f.LockBlockedTicks = r.ReadInt32(); f.RelockWindowTicks = r.ReadInt32();
+                f.Upgrades = r.ReadUInt64(); f.ActionsThisTurn = r.ReadInt32(); f.FreeDashUsed = r.ReadBoolean(); f.CarriedPoints = r.ReadInt32(); f.DraftPick = r.ReadInt32();
             }
             int count = r.ReadInt32();
-            sim.Projectiles.Clear();
+            Projectiles.Clear();
             for (int i = 0; i < count; i++)
             {
-                sim.Projectiles.Add(new Projectile
+                Projectiles.Add(new Projectile
                 {
-                    Id = r.ReadInt32(), Owner = r.ReadInt32(), Position = ReadVec(r), Velocity = ReadVec(r), AgeTicks = r.ReadInt32(),
+                    Id = r.ReadInt32(), Owner = r.ReadInt32(), Position = ReadVec(r), Velocity = ReadVec(r), Radius = r.ReadDouble(), AgeTicks = r.ReadInt32(),
                 });
             }
         }

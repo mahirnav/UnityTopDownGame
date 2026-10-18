@@ -14,7 +14,7 @@ namespace Rats.Sim.Net
     /// </summary>
     public static class NetProtocol
     {
-        public const int Version = 3; // 2: double snapshots, 3: lock-on timers in snapshots
+        public const int Version = 4; // 2: double snapshots, 3: lock-on timers, 4: drafting
         public const int DefaultPort = 7777;
 
         public static byte[] Encode(InputFrame frame)
@@ -37,6 +37,7 @@ namespace Rats.Sim.Net
     {
         InputFrame latest;
         bool melee, dash, ranged, toggleLock;
+        byte draftPick;
 
         public int FramesReceived { get; private set; }
 
@@ -48,13 +49,15 @@ namespace Rats.Sim.Net
             dash |= f.Dash;
             ranged |= f.Ranged;
             toggleLock |= f.ToggleLock;
+            if (f.DraftPick != 0) draftPick = f.DraftPick;
         }
 
         public InputFrame Read(int tick)
         {
             var f = latest;
-            f.Melee = melee; f.Dash = dash; f.Ranged = ranged; f.ToggleLock = toggleLock;
+            f.Melee = melee; f.Dash = dash; f.Ranged = ranged; f.ToggleLock = toggleLock; f.DraftPick = draftPick;
             melee = dash = ranged = toggleLock = false;
+            draftPick = 0;
             return f;
         }
 
@@ -62,6 +65,7 @@ namespace Rats.Sim.Net
         {
             latest = default;
             melee = dash = ranged = toggleLock = false;
+            draftPick = 0;
         }
     }
 

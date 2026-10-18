@@ -59,6 +59,16 @@ namespace Rats.SimTests
         }
 
         [Test]
+        public void RemoteDraftPickSurvivesUntilATickReadsIt()
+        {
+            var remote = new RemoteInput();
+            remote.Push(new InputFrame { DraftPick = 2 });
+            remote.Push(new InputFrame());
+            Assert.That(remote.Read(0).DraftPick, Is.EqualTo(2));
+            Assert.That(remote.Read(1).DraftPick, Is.EqualTo(0), "consumed once");
+        }
+
+        [Test]
         public void ClientSeesExactlyWhatTheHostSimulates()
         {
             using var host = new HostSession(0); // any free port

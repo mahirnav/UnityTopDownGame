@@ -82,7 +82,7 @@ namespace Rats.Game
             SaveRecording("restart");
             BuildWorld(overrideTunables ?? LoadTunables(), 0);
             Inputs[1] = host != null && host.HasPlayer ? host.RemoteInput : new SimpleBot(Sim, 1, Environment.TickCount);
-            recording = new MatchRecording(Sim.T);
+            recording = new MatchRecording(Sim.T, Sim.Seed);
         }
 
         void BuildWorld(Tunables tunables, int local)
@@ -92,7 +92,7 @@ namespace Rats.Game
             world = new GameObject("World").transform;
             localIndex = local;
 
-            Sim = new Simulation(tunables);
+            Sim = new Simulation(tunables, (ulong)DateTime.Now.Ticks); // fresh draft draws every round; replays store the seed
             BuildArena(Sim.Arena);
 
             for (int i = 0; i < 2; i++)
@@ -318,7 +318,7 @@ namespace Rats.Game
                 {
                     view = Primitives.Create(PrimitiveType.Sphere, world, new Color(1f, 0.45f, 0.1f));
                     view.name = $"Projectile {p.Id}";
-                    view.transform.localScale = Vector3.one * (float)(Sim.T.ProjectileRadius * 2);
+                    view.transform.localScale = Vector3.one * (float)(p.Radius * 2);
                     projectileViews[p.Id] = view;
                 }
                 view.transform.position = SimConvert.ToUnity(p.Position);
@@ -400,8 +400,10 @@ namespace Rats.Game
             GUI.Label(new Rect(12, 8, 900, 140),
                 $"Turn {Sim.Turn}   {phase}\n" +
                 $"tick {Sim.Tick}   combat tick {Sim.CombatTick}\n" +
-                $"You ({FighterColorNames[localIndex]})  HP {me.Hp}  AP {me.ActionPoints}  {(me.LockedOn ? "LOCKED" : "free")}   {Describe(me)}\n" +
-                $"{themName}  HP {them.Hp}  AP {them.ActionPoints}   {Describe(them)}\n" +
+                $"You ({FighterColorNames[localIndex]})  HP {me.Hp}/{me.MaxHp}  AP {me.ActionPoints}  {(me.LockedOn ? "LOCKED" : "free")}   {Describe(me)}\n" +
+                $"{themName}  HP {them.Hp}/{them.MaxHp}  AP {them.ActionPoints}   {Describe(them)}\n" +
+                $"Your hits: melee {Sim.HitDamage(me, ActionKind.Melee, them)} / ranged {Sim.HitDamage(me, ActionKind.Ranged, them)}   Upgrades: {Owned(me)}\n" +
+                $"{themName} hits: melee {Sim.HitDamage(them, ActionKind.Melee, me)} / ranged {Sim.HitDamage(them, ActionKind.Ranged, me)}   Upgrades: {Owned(them)}\n" +
                 $"WASD move  J melee  K ranged  Space dash  Tab lock  Q/E orbit{restartKeys}  Esc multiplayer\n" +
                 NetStatusLine());
             if (tunablesError != null) GUI.Label(new Rect(12, 150, 900, 40), tunablesError);
@@ -418,6 +420,7 @@ namespace Rats.Game
                     new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter });
             }
 
+            if (Sim.DraftActive && Sim.Phase == Phase.Freeze) DrawDraft(me, them);
             if (menuOpen) DrawMenu();
         }
 
@@ -469,10 +472,40 @@ namespace Rats.Game
             GUILayout.EndArea();
         }
 
+        static string Owned(Fighter f)
+        {
+            var names = new List<string>();
+            foreach (var u in Upgrades.Pool) if (f.Has(u)) names.Add(Upgrades.Name(u));
+            return names.Count == 0 ? "none" : string.Join(", ", names);
+        }
+
+        /// <summary>Draft screen: the same 3 offers for both players; keys 1-3 or click. Picks apply when the freeze ends.</summary>
+        void DrawDraft(Fighter me, Fighter them)
+        {
+            const float w = 620, h = 300;
+            GUILayout.BeginArea(new Rect((Screen.width - w) / 2, Screen.height - h - 20, w, h), GUI.skin.box);
+            GUILayout.Label($"DRAFT {Sim.DraftsThisRound}/{Sim.T.DraftsPerRound}: pick one (keys 1-3 or click)    {Sim.PhaseTicksLeft / 60f:F1}s");
+            GUILayout.Label(isClient || Online ? (them.DraftPick != 0 ? "Opponent has picked." : "Opponent is choosing...")
+                                               : (them.DraftPick != 0 ? "Bot has picked." : "Bot is choosing..."));
+            for (int slot = 0; slot < 3; slot++)
+            {
+                int offer = Sim.Offer(slot);
+                if (offer == Simulation.NoOffer) continue;
+                var u = (UpgradeId)offer;
+                string state = me.Has(u) ? "  (you have it)" : me.DraftPick == offer + 1 ? "  <- YOUR PICK" : "";
+                GUI.enabled = me.DraftPick == 0 && !me.Has(u);
+                if (GUILayout.Button($"[{slot + 1}] {Upgrades.Name(u)}{state}\n{Upgrades.Describe(u, Sim.T)}", GUILayout.Height(58)))
+                    keyboard.ChooseDraft(slot + 1);
+                GUI.enabled = true;
+            }
+            GUILayout.Label(me.DraftPick == 0 ? "No pick when the timer ends = first offer you don't own." : "Locked in. Applies when time resumes.");
+            GUILayout.EndArea();
+        }
+
         string Describe(Fighter f)
         {
             if (!f.IsBusy) return "";
-            var def = Sim.T.Get(f.Action);
+            var def = f.Frames;
             string part = f.ActionTick < def.Startup ? "startup" : def.IsActive(f.ActionTick) ? "ACTIVE" : "recovery";
             return $"{f.Action} {part} {f.ActionTick}/{def.Total}";
         }

@@ -12,12 +12,15 @@ namespace Rats.Sim
     {
         public float MoveX, MoveZ;
         public bool Melee, Dash, Ranged, ToggleLock;
+        /// <summary>Draft choice during a draft freeze: 1-3 = offer, 0 = none.</summary>
+        public byte DraftPick;
 
         public void Write(BinaryWriter w)
         {
             w.Write(MoveX);
             w.Write(MoveZ);
             w.Write((byte)((Melee ? 1 : 0) | (Dash ? 2 : 0) | (Ranged ? 4 : 0) | (ToggleLock ? 8 : 0)));
+            w.Write(DraftPick);
         }
 
         public static InputFrame Read(BinaryReader r)
@@ -28,6 +31,7 @@ namespace Rats.Sim
             f.Dash = (b & 2) != 0;
             f.Ranged = (b & 4) != 0;
             f.ToggleLock = (b & 8) != 0;
+            f.DraftPick = r.ReadByte();
             return f;
         }
     }

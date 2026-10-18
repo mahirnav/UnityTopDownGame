@@ -74,6 +74,8 @@ namespace Rats.SimTests
                          : t == typeof(double) ? seed * 1.25
                          : t == typeof(bool) ? true
                          : t == typeof(Vec3) ? new Vec3(seed, seed + 0.5f, -seed)
+                         : t == typeof(ulong) ? (ulong)seed * 977
+                         : t == typeof(ActionDef) ? new ActionDef(seed, seed + 1, seed + 2, seed + 3)
                          : t.IsEnum ? System.Enum.GetValues(t).GetValue(1)
                          : throw new AssertionException($"{o.GetType().Name}.{f.Name}: add {t.Name} to this test's Fill()");
                 f.SetValue(o, v);
@@ -103,10 +105,10 @@ namespace Rats.SimTests
         [Test]
         public void InputFrameRoundTripsThroughBytes()
         {
-            var frame = new InputFrame { MoveX = -0.25f, MoveZ = 0.75f, Melee = true, ToggleLock = true };
+            var frame = new InputFrame { MoveX = -0.25f, MoveZ = 0.75f, Melee = true, ToggleLock = true, DraftPick = 2 };
             using var ms = new System.IO.MemoryStream();
             using (var w = new System.IO.BinaryWriter(ms, System.Text.Encoding.UTF8, true)) frame.Write(w);
-            Assert.That(ms.Length, Is.EqualTo(9), "keep the per-tick input tiny");
+            Assert.That(ms.Length, Is.EqualTo(10), "keep the per-tick input tiny");
             ms.Position = 0;
             var back = InputFrame.Read(new System.IO.BinaryReader(ms));
             Assert.That(back, Is.EqualTo(frame));

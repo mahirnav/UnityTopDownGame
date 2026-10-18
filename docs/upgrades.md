@@ -2,7 +2,7 @@
 
 ## P1 decision (Nick, 2026-10-17)
 
-P1 tests **mid-round drafting of core-action upgrades only** (no starting ability yet). Not built yet.
+P1 tests **mid-round drafting of core-action upgrades only** (no starting ability yet). **Built** (tests pass; not yet playtested). Numbers are in `tunables.txt`.
 
 | Upgrade | Effect | When it applies |
 |---|---|---|

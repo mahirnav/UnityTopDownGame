@@ -15,6 +15,7 @@ namespace Rats.Sim
         int nextActionTick;
         int strafeSign = 1;
         int nextStrafeFlip;
+        int draftDecideTick = -1;
 
         public SimpleBot(Simulation sim, int index, int seed)
         {
@@ -27,9 +28,25 @@ namespace Rats.Sim
         public InputFrame Read(int tick)
         {
             var frame = new InputFrame();
+            var me = sim.Fighters[index];
+            if (sim.DraftActive && me.DraftPick == 0)
+            {
+                // Think for a moment, then take a random offer it doesn't own yet.
+                if (draftDecideTick < 0) draftDecideTick = tick + rng.Next(20, 120);
+                if (tick >= draftDecideTick)
+                {
+                    int slot = rng.Next(3);
+                    for (int k = 0; k < 3; k++, slot = (slot + 1) % 3)
+                    {
+                        int offer = sim.Offer(slot);
+                        if (offer != Simulation.NoOffer && !me.Has((UpgradeId)offer)) { frame.DraftPick = (byte)(slot + 1); break; }
+                    }
+                    draftDecideTick = -1;
+                }
+                return frame;
+            }
             if (sim.Phase != Phase.Combat) return frame;
 
-            var me = sim.Fighters[index];
             var them = sim.Opponent(me);
             var to = (them.Position - me.Position).Flat;
             double dist = to.Length;
