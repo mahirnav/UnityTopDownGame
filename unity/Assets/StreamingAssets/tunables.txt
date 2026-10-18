@@ -9,7 +9,12 @@ ActionPointsPerTurn = 3
 # --- Fighters ---
 MaxHp = 100
 FighterRadius = 0.4
-MoveSpeed = 5               # walking; fighters are rooted while an action plays
+MoveSpeed = 5               # walking
+StartupWalkMultiplier = 0   # walk speed during melee/ranged startup: 0 = rooted (current), try 0.5
+
+# --- Lock-on ---
+LockOnGraceTicks = 0        # ticks of lost sight before lock breaks: 0 = instant (current), try 6-9
+AutoRelockTicks = 0         # lock returns by itself if the target reappears within this: 0 = off, try 30
 
 # --- Melee ---
 MeleeCost = 1

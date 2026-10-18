@@ -24,6 +24,11 @@ namespace Rats.Sim
         public int MaxHp = 100;
         public double FighterRadius = 0.4;
         public double MoveSpeed = 5;           // m/s, walking (not during actions)
+        public double StartupWalkMultiplier = 0; // walk speed fraction during melee/ranged startup (0 = rooted)
+
+        // Lock-on
+        public int LockOnGraceTicks = 0;       // ticks of lost sight before lock breaks (0 = immediately)
+        public int AutoRelockTicks = 0;        // after a break, lock returns if the target reappears within this (0 = off)
 
         // Melee
         public int MeleeCost = 1;

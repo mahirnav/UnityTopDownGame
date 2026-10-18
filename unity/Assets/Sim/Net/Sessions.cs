@@ -14,7 +14,7 @@ namespace Rats.Sim.Net
     /// </summary>
     public static class NetProtocol
     {
-        public const int Version = 2; // 2: double snapshots
+        public const int Version = 3; // 2: double snapshots, 3: lock-on timers in snapshots
         public const int DefaultPort = 7777;
 
         public static byte[] Encode(InputFrame frame)

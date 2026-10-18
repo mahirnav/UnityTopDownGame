@@ -21,6 +21,10 @@ namespace Rats.Sim
         public Vec3 ActionDir;
         public bool ActionHitLanded;
         public bool LockedOn;
+        /// <summary>Ticks in a row the opponent has been out of sight while locked (grace period).</summary>
+        public int LockBlockedTicks;
+        /// <summary>Ticks left in which lock comes back on its own if the opponent reappears (0 = none).</summary>
+        public int RelockWindowTicks;
 
         public Fighter(int index) { Index = index; }
 
@@ -56,7 +60,7 @@ namespace Rats.Sim
     {
         public const int NoWinner = -1;
         public const int Draw = 2;
-        const int SnapshotVersion = 2; // 2: doubles
+        const int SnapshotVersion = 3; // 2: doubles, 3: lock-on timers
 
         public readonly Tunables T;
         public readonly Arena Arena;
@@ -127,8 +131,7 @@ namespace Rats.Sim
             Projectiles.RemoveAll(p => p.AgeTicks >= T.ProjectileLifetimeTicks
                                        || !Arena.Inside(p.Position, T.ProjectileRadius)
                                        || Arena.HitsPillar(p.Position, T.ProjectileRadius));
-            foreach (var f in Fighters)
-                if (f.LockedOn && !Arena.LineOfSight(f.Position, Opponent(f).Position)) f.LockedOn = false;
+            foreach (var f in Fighters) UpdateLockOn(f);
 
             // Damage
             Projectiles.RemoveAll(ProjectileHit);
@@ -174,7 +177,19 @@ namespace Rats.Sim
         {
             var opponent = Opponent(f);
             if (input.ToggleLock)
-                f.LockedOn = !f.LockedOn && Arena.LineOfSight(f.Position, opponent.Position);
+            {
+                if (f.LockedOn)
+                {
+                    f.LockedOn = false;
+                    f.LockBlockedTicks = 0;
+                    f.RelockWindowTicks = 0; // a deliberate unlock stays unlocked
+                }
+                else if (Arena.LineOfSight(f.Position, opponent.Position))
+                {
+                    f.LockedOn = true;
+                    f.RelockWindowTicks = 0;
+                }
+            }
 
             if (f.IsBusy) return; // no cancels, no buffering
             var kind = input.Melee ? ActionKind.Melee
@@ -204,7 +219,17 @@ namespace Rats.Sim
                     f.Position = Arena.Constrain(f.Position + f.ActionDir * (T.DashSpeed * Tunables.TickDt), T.FighterRadius);
                 return;
             }
-            if (f.IsBusy) return; // rooted during melee and ranged
+            if (f.IsBusy)
+            {
+                // Melee/ranged startup: walk at a fraction of speed (0 = rooted). Facing stays where the action started.
+                if (T.StartupWalkMultiplier > 0 && f.ActionTick < T.Get(f.Action).Startup)
+                {
+                    var step = MoveVector(input);
+                    if (step != Vec3.Zero)
+                        f.Position = Arena.Constrain(f.Position + step * (T.MoveSpeed * T.StartupWalkMultiplier * Tunables.TickDt), T.FighterRadius);
+                }
+                return;
+            }
 
             var move = MoveVector(input);
             if (move != Vec3.Zero)
@@ -213,6 +238,30 @@ namespace Rats.Sim
                 if (!f.LockedOn) f.Facing = move.Normalized;
             }
             if (f.LockedOn) f.Facing = FaceToward(f, Opponent(f));
+        }
+
+        /// <summary>
+        /// Pillars break lock-on after LockOnGraceTicks of lost sight (0 = immediately). Within AutoRelockTicks
+        /// after a break, lock returns by itself if the opponent reappears; otherwise Tab re-locks.
+        /// </summary>
+        void UpdateLockOn(Fighter f)
+        {
+            bool visible = Arena.LineOfSight(f.Position, Opponent(f).Position);
+            if (f.LockedOn)
+            {
+                f.LockBlockedTicks = visible ? 0 : f.LockBlockedTicks + 1;
+                if (f.LockBlockedTicks > T.LockOnGraceTicks)
+                {
+                    f.LockedOn = false;
+                    f.LockBlockedTicks = 0;
+                    f.RelockWindowTicks = T.AutoRelockTicks;
+                }
+            }
+            else if (f.RelockWindowTicks > 0)
+            {
+                if (visible) { f.LockedOn = true; f.RelockWindowTicks = 0; }
+                else f.RelockWindowTicks--;
+            }
         }
 
         static Vec3 MoveVector(InputFrame input)
@@ -292,6 +341,7 @@ namespace Rats.Sim
                 Write(w, f.Position); Write(w, f.Facing);
                 w.Write(f.Hp); w.Write(f.ActionPoints); w.Write((int)f.Action); w.Write(f.ActionTick);
                 Write(w, f.ActionDir); w.Write(f.ActionHitLanded); w.Write(f.LockedOn);
+                w.Write(f.LockBlockedTicks); w.Write(f.RelockWindowTicks);
             }
             w.Write(Projectiles.Count);
             foreach (var p in Projectiles)
@@ -323,6 +373,7 @@ namespace Rats.Sim
                 f.Position = ReadVec(r); f.Facing = ReadVec(r);
                 f.Hp = r.ReadInt32(); f.ActionPoints = r.ReadInt32(); f.Action = (ActionKind)r.ReadInt32(); f.ActionTick = r.ReadInt32();
                 f.ActionDir = ReadVec(r); f.ActionHitLanded = r.ReadBoolean(); f.LockedOn = r.ReadBoolean();
+                f.LockBlockedTicks = r.ReadInt32(); f.RelockWindowTicks = r.ReadInt32();
             }
             int count = r.ReadInt32();
             sim.Projectiles.Clear();

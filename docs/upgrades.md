@@ -1,5 +1,27 @@
 # Upgrade pool: draft for Nick to cut
 
+## P1 decision (Nick, 2026-10-17)
+
+P1 tests **mid-round drafting of core-action upgrades only** (no starting ability yet). Not built yet.
+
+| Upgrade | Effect | When it applies |
+|---|---|---|
+| Heavy Blade | Melee damage +8 | Read when the hit lands (affects frozen swings) |
+| Long Reach | Melee range +0.6 m | Locked when the swing starts |
+| Big Bolt | Projectile radius ×2 | Locked when the bolt is fired |
+| Fortification | +25 max HP, +10 HP immediately (amount to retest) | Immediately |
+| Free Step | First dash each turn costs 0 | Future turns |
+| Opening Move | First action each turn has −50% startup | Locked when the action starts |
+| Exhaustion Punish | +20% damage against a target with 0 action points | Read when the hit lands |
+| Carry the Flame | Each unspent point at turn end: small damage bonus next turn (points don't carry) | Next turn |
+
+Working rules for P1 (leaning, revisit after play): values are either **read when a hit lands** (damage,
+damage taken, HP, lifesteal) or **locked when an action starts** (timing, range, arc, dash distance, projectile
+size/speed). About 3 drafts per round on alternate freezes, upgrades reset each round, no duplicates,
+mirrored offers, seeded draw.
+
+---
+
 Tick `[x]` to **keep**, delete the line (or write `CUT`) to drop. Add notes inline. Numbers are starting
 values; every one becomes a tunable. P1 needs ~8; the rest can rotate in later.
 
