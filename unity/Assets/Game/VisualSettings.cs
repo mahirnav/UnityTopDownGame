@@ -18,8 +18,23 @@ namespace Rats.Game
         public float Dither = 0f;              // ordered dither strength (0 = none; 0.6 = PS2 look)
         public bool SmoothTextures = true;     // smooth hand-painted WoW feel (false = crisp point-sampled pixels)
         public float FreezeDesaturate = 0.55f; // how gray/icy the world goes during a freeze (0 = off)
-        public float TintR = 1.06f, TintG = 0.94f, TintB = 0.86f; // warm sunset grade (1,1,1 = neutral)
-        public float Saturation = 1.12f;       // 1 = unchanged
+        public float TintR = 1.03f, TintG = 0.98f, TintB = 0.94f; // color grade (1,1,1 = neutral; 1.06/0.94/0.86 suits the painted sky)
+        public float Saturation = 1.08f;       // 1 = unchanged
+
+        // Light and sky (HDRI from Resources/PolyHaven/Sky; falls back to the painted dome)
+        public bool SkyHdri = true;            // photographic sky + lighting from it (false = painted sunset dome)
+        public float SkyExposure = 0.5f;       // sky brightness (also how strongly the sky lights the scene)
+        public float SkyRotation = 0f;         // degrees: turns the sky (and the sun with it) around the arena
+        public float SkyAmbient = 1f;          // extra multiplier on the sky's light on the scene
+        public float SunMinElevation = 25f;    // degrees: sunlight never comes in lower than this (long shadows hide the pit)
+        public float Exposure = 1f;            // overall camera exposure
+        public bool Tonemap = true;            // film-style ACES tone mapping (false = plain clamp)
+        public float Bloom = 0.25f;            // glow around bright things: sun, torches, fire (0 = off)
+        public float BloomThreshold = 1.5f;    // brightness where glow starts
+
+        // Surfaces: "polyhaven" uses the downloaded textures, "generated" the code-made ones
+        public string FloorStyle = "polyhaven";
+        public string WallStyle = "polyhaven";
 
         // Atmosphere
         public float FogStart = 14f;

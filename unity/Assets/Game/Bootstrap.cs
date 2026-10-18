@@ -107,8 +107,9 @@ namespace Rats.Game
             int uiLayer = LayerMask.NameToLayer("UI");
             var cam = new GameObject("Camera").AddComponent<Camera>();
             cam.transform.SetParent(world, false);
-            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.clearFlags = CameraClearFlags.Skybox;               // the HDRI sky; plain color when there is none
             cam.backgroundColor = new Color(0.62f, 0.42f, 0.30f);
+            cam.allowHDR = true;                                    // keeps sun and fire brighter than white for glow and tone mapping
             cam.fieldOfView = 55f;
             cam.farClipPlane = 1000f;
             cam.cullingMask = ~(1 << uiLayer);

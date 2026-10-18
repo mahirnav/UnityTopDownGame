@@ -6,10 +6,25 @@ ColorLevels = 0            # color steps per channel: lower = stronger banding (
 Dither = 0                 # ordered dither strength to hide banding (0 = none)
 SmoothTextures = true      # true = smooth hand-painted look, false = crisp pixels
 FreezeDesaturate = 0.55    # world turns gray-blue during a freeze (0 = off)
-TintR = 1.06               # color grade: warm sunset (1, 1, 1 = neutral)
-TintG = 0.94
-TintB = 0.86
-Saturation = 1.12          # 1 = unchanged
+TintR = 1.03               # color grade (1, 1, 1 = neutral; 1.06 / 0.94 / 0.86 suits the painted sky)
+TintG = 0.98
+TintB = 0.94
+Saturation = 1.08          # 1 = unchanged
+
+# --- Light and sky ---
+SkyHdri = true             # photographic HDRI sky with lighting from it (false = painted sunset dome)
+SkyExposure = 0.5          # sky brightness (also how strongly the sky lights the scene)
+SkyRotation = 0            # degrees: turns the sky, and the sun with it, around the arena
+SkyAmbient = 1             # extra multiplier on the sky's light on the scene
+SunMinElevation = 25       # degrees: sunlight never comes in lower than this (long shadows hide the pit)
+Exposure = 1               # overall camera exposure
+Tonemap = true             # film-style tone mapping (false = plain clamp)
+Bloom = 0.25               # glow around bright things: sun, torches, fire (0 = off)
+BloomThreshold = 1.5       # brightness where the glow starts
+
+# --- Surfaces: polyhaven = downloaded textures, generated = code-made ones ---
+FloorStyle = polyhaven
+WallStyle = polyhaven
 
 # --- Atmosphere ---
 FogStart = 14

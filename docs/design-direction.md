@@ -33,6 +33,12 @@ Where the game is heading, from Nick's design discussions. Three levels, and the
   stone buttresses, arched gate, wooden posts on spiked iron bases, chains, cobbled dirt with ochre patches) under a
   red-orange hazy sunset. **Visual pass 2 (built)** follows those references; the camera stays inside the taller walls.
   Next art step: a real character model (Nick is sourcing one; rigged humanoid FBX + ~6 animations).
+- **Realistic sunset lighting on a WoW-style game (Nick, 2026-10-18; built):** photographic Poly Haven HDRI sky
+  (kiara_1_dawn) lights the scene (sky ambient + reflections, sun placed at the brightest spot in the photo, light
+  kept at 25°+ so the pit isn't all wall shadow); HDR camera with glow (bloom) and film tone mapping; project in Linear
+  color space. Scanned Poly Haven sand floor and rock walls with bump maps. All CC0, in `Assets/Resources/PolyHaven/`.
+  Every part has a visuals.txt switch back to the painted sky / generated textures (`SkyHdri`, `FloorStyle`, `WallStyle`).
+  Katana model waits on an FBX download (no Blender here).
 - **Visual pass 1 (built, all knobs in visuals.txt):** PS2-style render (360p point upscale, color banding + dither),
   icy desaturation during freezes, painted dusk sky, generated sand/stone textures, wall caps, pillar bases/caps, tiered
   stands with a crowd, torches with flickering light, banners; hit sparks, dash dust, bolt trails, swing-arc flash showing

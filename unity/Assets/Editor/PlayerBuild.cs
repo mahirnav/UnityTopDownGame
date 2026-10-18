@@ -42,7 +42,7 @@ namespace Rats.EditorTools
         static readonly string[] CodeOnlyShaders =
         {
             "Standard", "Unlit/Color", "Sprites/Default", "UI/Default", "Hidden/RatsRetro",
-            "Legacy Shaders/Particles/Additive", "Legacy Shaders/Particles/Alpha Blended",
+            "Legacy Shaders/Particles/Additive", "Legacy Shaders/Particles/Alpha Blended", "Skybox/Panoramic",
         };
 
         static void IncludeCodeOnlyShaders()

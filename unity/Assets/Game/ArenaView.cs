@@ -25,17 +25,31 @@ namespace Rats.Game
             var cobbles = Lit(ProcTex.Cobbles(new Color(0.66f, 0.50f, 0.33f), 31), new Vector2((float)arena.RadiusX * 0.8f, (float)arena.RadiusZ * 0.8f)); // same cobble size at any arena size
             var dirt = Lit(ProcTex.Sand(new Color(0.34f, 0.24f, 0.18f), new Color(0.25f, 0.17f, 0.13f), 12), new Vector2(40f, 40f));
             var plaster = Lit(ProcTex.Plaster(new Color(0.66f, 0.55f, 0.42f), 41), new Vector2(1f, 2.5f));
+
+            // Downloaded Poly Haven surfaces (visuals.txt FloorStyle / WallStyle); generated ones if missing.
+            bool sandFloor = false;
+            if (look.FloorStyle == "polyhaven")
+            {
+                var sand = Scanned("Sand/sand", new Vector2((float)arena.RadiusX * 0.6f, (float)arena.RadiusZ * 0.6f));
+                if (sand != null)
+                {
+                    cobbles = sand;
+                    dirt = Scanned("Sand/sand", new Vector2(60f, 60f), new Color(0.62f, 0.55f, 0.5f));
+                    sandFloor = true;
+                }
+            }
+            if (look.WallStyle == "polyhaven") plaster = Scanned("RockWall/rock", new Vector2(1f, 2.5f)) ?? plaster;
             var trim = Lit(ProcTex.Blocks(new Color(0.34f, 0.33f, 0.34f), 1, 2, 22), Vector2.one);
             var roundStone = Lit(ProcTex.RoundStones(new Color(0.36f, 0.39f, 0.44f), 51), new Vector2(2f, 3f));
             var wood = Lit(ProcTex.Wood(new Color(0.30f, 0.24f, 0.19f), 61), new Vector2(2f, 2f));
             var iron = Lit(ProcTex.Iron(new Color(0.22f, 0.24f, 0.28f), 71), Vector2.one);
             var standStone = Lit(ProcTex.Blocks(new Color(0.30f, 0.25f, 0.22f), 2, 4, 24), new Vector2(4f, 1f));
 
-            Lighting(world, look);
+            bool photoSky = Lighting(world, look);
 
             Part(PrimitiveType.Plane, world, dirt, "Outside", new Vector3(0f, -0.02f, 0f), new Vector3(30f, 1f, 30f));
             Part(PrimitiveType.Cylinder, world, cobbles, "Floor", Vector3.zero, new Vector3((float)arena.RadiusX * 2f, 0.01f, (float)arena.RadiusZ * 2f));
-            Patches(world, arena);
+            if (!sandFloor) Patches(world, arena);
 
             Walls(world, arena, plaster, trim);
             var buttressAt = new int[8];
@@ -48,12 +62,13 @@ namespace Rats.Game
             foreach (var c in arena.Pillars) Post(world, SimConvert.ToUnity(c), (float)arena.PillarRadius, wood, iron, arena);
 
             Stands(world, arena, standStone, look.CrowdSize);
-            Mountains(world);
+            if (!photoSky) Mountains(world);
         }
 
         // --- Light and sky ------------------------------------------------------------------
 
-        static void Lighting(Transform world, VisualSettings look)
+        /// <summary>Sun, sky, ambient and fog. True when the photographic HDRI sky is in use.</summary>
+        static bool Lighting(Transform world, VisualSettings look)
         {
             var sun = new GameObject("Sun").AddComponent<Light>();
             sun.transform.SetParent(world, false);
@@ -65,18 +80,21 @@ namespace Rats.Game
             sun.cookie = ProcTex.Dapple(81);                          // dappled shade, as if through canopy and banners
             sun.cookieSize = 18f;
 
-            SkyDome(world);
-            RenderSettings.skybox = null;
             RenderSettings.sun = sun;
-            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.62f, 0.38f, 0.34f);
-            RenderSettings.ambientEquatorColor = new Color(0.52f, 0.32f, 0.24f);
-            RenderSettings.ambientGroundColor = new Color(0.24f, 0.15f, 0.12f);
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Linear;
             RenderSettings.fogColor = Haze;
             RenderSettings.fogStartDistance = look.FogStart;
             RenderSettings.fogEndDistance = look.FogEnd;
+            if (SkyView.TrySetup(world, look, sun)) return true;
+
+            SkyDome(world);
+            RenderSettings.skybox = null;
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+            RenderSettings.ambientSkyColor = new Color(0.62f, 0.38f, 0.34f);
+            RenderSettings.ambientEquatorColor = new Color(0.52f, 0.32f, 0.24f);
+            RenderSettings.ambientGroundColor = new Color(0.24f, 0.15f, 0.12f);
+            return false;
         }
 
         /// <summary>Painted sunset: inverted dome with vertex colors, hot horizon to wine-red zenith (unlit, unfogged).</summary>
@@ -360,6 +378,8 @@ namespace Rats.Game
         {
             var mesh = new Mesh { name = name };
             mesh.SetVertices(verts);
+            if (QualitySettings.activeColorSpace == ColorSpace.Linear) // vertex colors skip the color-space conversion
+                for (int i = 0; i < colors.Count; i++) colors[i] = colors[i].linear;
             mesh.SetColors(colors);
             mesh.SetTriangles(tris, 0);
             var go = new GameObject(name);
@@ -381,6 +401,24 @@ namespace Rats.Game
             var m = new Material(Shader.Find("Standard")) { color = color ?? Color.white };
             m.SetFloat("_Glossiness", 0.05f);
             if (tex != null) { m.mainTexture = tex; m.mainTextureScale = tiling; }
+            return m;
+        }
+
+        /// <summary>
+        /// Scanned Poly Haven surface from Resources/PolyHaven: "{path}_diff" color plus "{path}_nor_gl" bumps.
+        /// Null if the color texture is missing.
+        /// </summary>
+        static Material Scanned(string path, Vector2 tiling, Color? color = null)
+        {
+            var diffuse = Resources.Load<Texture2D>("PolyHaven/" + path + "_diff");
+            if (diffuse == null) return null;
+            var m = Lit(diffuse, tiling, color);
+            var normal = Resources.Load<Texture2D>("PolyHaven/" + path + "_nor_gl");
+            if (normal != null)
+            {
+                m.SetTexture("_BumpMap", normal);
+                m.EnableKeyword("_NORMALMAP");
+            }
             return m;
         }
 

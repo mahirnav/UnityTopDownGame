@@ -117,8 +117,8 @@ namespace Rats.Game
                 float flicker = paused ? 0.5f : Mathf.PerlinNoise(k * 0.35f, t * 3f);
                 fireVerts[k * 2] = new Vector3(c * rx * s, 0.04f, sn * rz * s);
                 fireVerts[k * 2 + 1] = new Vector3(c * (rx + 0.3f), 0.04f, sn * (rz + 0.3f));
-                fireColors[k * 2] = new Color(1f, 0.55f + 0.3f * flicker, 0.12f, 0.95f);
-                fireColors[k * 2 + 1] = new Color(0.55f, 0.08f, 0.03f, 0.75f);
+                fireColors[k * 2] = Linear(new Color(1f, 0.55f + 0.3f * flicker, 0.12f, 0.95f));
+                fireColors[k * 2 + 1] = Linear(new Color(0.55f, 0.08f, 0.03f, 0.75f));
                 if (!paused && Random.value < 0.08f)
                     sparks.Emit(new ParticleSystem.EmitParams
                     {
@@ -133,6 +133,9 @@ namespace Rats.Game
             fireMesh.colors = fireColors;
             fireMesh.RecalculateBounds();
         }
+
+        /// <summary>Mesh vertex colors skip Unity's color-space conversion; convert by hand in Linear projects.</summary>
+        static Color Linear(Color c) => QualitySettings.activeColorSpace == ColorSpace.Linear ? c.linear : c;
 
         static ParticleSystem MakeSystem(Transform parent, string name, string shader)
         {

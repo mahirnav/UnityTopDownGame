@@ -73,6 +73,9 @@ Screenshots/logs go to `captures/` (git-ignored). Look at the screenshots after 
 - The HUD is uGUI on its own camera (`RenderAll` renders world + HUD), so headless captures show it. Damage pop-ups,
   particles and time-based fades don't render faithfully in edit-mode captures; check those in play mode.
 - Visual knobs live in `visuals.txt` (`VisualSettings`), never in `tunables.txt` (gameplay only, sent to clients and replays).
+- The project is in **Linear color space** (`RATS/Apply Project Settings`). Mesh vertex colors skip the conversion, so
+  convert them with `.linear` (see `Effects.Linear`); translucent UI blends lighter than in gamma. Colors read from the
+  HDRI are linear: use `.gamma` before giving them to lights or fog.
 - Don't screen-grab the desktop or pop game windows to check visuals; use the headless capture.
 
 ## Design direction

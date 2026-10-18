@@ -16,7 +16,7 @@ namespace Rats.Game
     {
         const int CueTicks = 60;
         static readonly Color Ice = new Color(0.62f, 0.85f, 1f);
-        static readonly Color Panel = new Color(0.08f, 0.06f, 0.05f, 0.72f);
+        static readonly Color Panel = new Color(0.08f, 0.06f, 0.05f, 0.86f); // Linear color space blends lighter, hence the high alpha
         static readonly Color Gold = new Color(1f, 0.82f, 0.35f);
         static readonly Color Blood = new Color(0.78f, 0.16f, 0.12f);
         const float PopupSeconds = 1f;
