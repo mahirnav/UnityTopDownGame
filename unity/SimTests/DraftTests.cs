@@ -16,7 +16,7 @@ namespace Rats.SimTests
             t.FreezeTicks = 30;
             t.DraftFreezeTicks = 100;
             t.DraftsPerRound = 3;
-            t.DraftInterval = 2;
+            t.DraftInterval = 1;
         }
 
         static void Grant(Fighter f, UpgradeId u) => f.Upgrades |= 1UL << (int)u;
@@ -29,7 +29,7 @@ namespace Rats.SimTests
                 var sim = Create(Drafting, seed);
                 RunUntil(sim, s => s.DraftActive);
                 for (int slot = 0; slot < 3; slot++)
-                    if (sim.Offer(slot) == (int)wanted) return (seed, (byte)(slot + 1));
+                    if (Simulation.Offer(sim.Fighters[0], slot) == (int)wanted) return (seed, (byte)(slot + 1));
             }
             Assert.Fail($"no seed offers {wanted}");
             return default;
@@ -45,7 +45,7 @@ namespace Rats.SimTests
         // --- Drafting ---------------------------------------------------------------------
 
         [Test]
-        public void DraftsHappenOnAlternateFreezesUpToTheCap()
+        public void DraftsHappenOnTheFirstThreeFreezes()
         {
             var sim = Create(Drafting);
             var drafts = new List<bool>();
@@ -57,28 +57,46 @@ namespace Rats.SimTests
                 lengths.Add(sim.PhaseTicksLeft);
                 RunUntil(sim, s => !s.IsFrozen);
             }
-            Assert.That(drafts, Is.EqualTo(new[] { true, false, true, false, true, false, false }));
-            Assert.That(lengths, Is.EqualTo(new[] { 100, 30, 100, 30, 100, 30, 30 }));
+            Assert.That(drafts, Is.EqualTo(new[] { true, true, true, false, false, false, false }));
+            Assert.That(lengths, Is.EqualTo(new[] { 100, 100, 100, 30, 30, 30, 30 }));
             Assert.That(sim.DraftsThisRound, Is.EqualTo(3));
         }
 
         [Test]
-        public void OffersAreThreeDistinctUpgradesReproducibleFromTheSeed()
+        public void EachPlayerGetsTheirOwnThreeOffersReproducibleFromTheSeed()
         {
             var seen = new HashSet<string>();
+            bool playersDiffered = false;
             for (ulong seed = 1; seed <= 10; seed++)
             {
                 var a = Create(Drafting, seed);
                 var b = Create(Drafting, seed);
                 RunUntil(a, s => s.DraftActive);
                 RunUntil(b, s => s.DraftActive);
-                var offers = new[] { a.Offer(0), a.Offer(1), a.Offer(2) };
-                Assert.That(new[] { b.Offer(0), b.Offer(1), b.Offer(2) }, Is.EqualTo(offers), "same seed, same offers");
-                Assert.That(offers, Is.Unique);
-                Assert.That(offers, Is.All.InRange(0, Upgrades.Pool.Length - 1));
-                seen.Add(string.Join(",", offers));
+                for (int i = 0; i < 2; i++)
+                {
+                    var offers = Offers(a.Fighters[i]);
+                    Assert.That(Offers(b.Fighters[i]), Is.EqualTo(offers), "same seed, same offers");
+                    Assert.That(offers, Is.Unique);
+                    Assert.That(offers, Is.All.InRange(0, Upgrades.Pool.Length - 1));
+                    seen.Add(string.Join(",", offers));
+                }
+                if (string.Join(",", Offers(a.Fighters[0])) != string.Join(",", Offers(a.Fighters[1]))) playersDiffered = true;
             }
             Assert.That(seen.Count, Is.GreaterThan(1), "different seeds should give different offers");
+            Assert.That(playersDiffered, Is.True, "players should usually get different offers");
+        }
+
+        [Test]
+        public void OffersNeverIncludeUpgradesYouAlreadyOwn()
+        {
+            var sim = Create(Drafting, seed: 7);
+            var f = sim.Fighters[0];
+            var owned = new[] { UpgradeId.HeavyBlade, UpgradeId.LongReach, UpgradeId.BigBolt, UpgradeId.FreeStep, UpgradeId.OpeningMove };
+            foreach (var u in owned) Grant(f, u);
+            RunUntil(sim, s => s.DraftActive);
+            Assert.That(Offers(f), Is.EquivalentTo(new[] { (int)UpgradeId.Fortification, (int)UpgradeId.ExhaustionPunish, (int)UpgradeId.CarryTheFlame }),
+                "only the 3 unowned upgrades remain");
         }
 
         [Test]
@@ -86,30 +104,29 @@ namespace Rats.SimTests
         {
             var sim = Create(Drafting);
             RunUntil(sim, s => s.DraftActive);
-            int offer2 = sim.Offer(1), offer1 = sim.Offer(0);
+            int mine = Simulation.Offer(sim.Fighters[0], 1), theirs = Simulation.Offer(sim.Fighters[1], 0);
             sim.Step(new InputFrame { DraftPick = 2 }, default);
             Assert.That(sim.Fighters[0].Upgrades, Is.Zero, "picks must not apply during the freeze");
-            Assert.That(sim.Fighters[0].DraftPick, Is.EqualTo(offer2 + 1));
+            Assert.That(sim.Fighters[0].DraftPick, Is.EqualTo(mine + 1));
 
             RunUntil(sim, s => !s.IsFrozen);
-            Assert.That(sim.Fighters[0].Has((UpgradeId)offer2), Is.True);
-            Assert.That(sim.Fighters[1].Has((UpgradeId)offer1), Is.True, "no pick in time: first valid offer");
-            Assert.That(sim.Offer(0), Is.EqualTo(Simulation.NoOffer), "offers cleared after the draft");
+            Assert.That(sim.Fighters[0].Has((UpgradeId)mine), Is.True);
+            Assert.That(sim.Fighters[1].Has((UpgradeId)theirs), Is.True, "no pick in time: first offer");
+            Assert.That(Simulation.Offer(sim.Fighters[0], 0), Is.EqualTo(Simulation.NoOffer), "offers cleared after the draft");
         }
 
         [Test]
-        public void FirstPickLocksAndOwnedUpgradesCannotBePicked()
+        public void FirstPickLocksIn()
         {
             var sim = Create(Drafting);
             RunUntil(sim, s => s.DraftActive);
             var f = sim.Fighters[0];
-            Grant(f, (UpgradeId)sim.Offer(0));                      // already owns offer 1
-            sim.Step(new InputFrame { DraftPick = 1 }, default);
-            Assert.That(f.DraftPick, Is.Zero, "picking an owned upgrade is ignored");
             sim.Step(new InputFrame { DraftPick = 2 }, default);
             sim.Step(new InputFrame { DraftPick = 3 }, default);
-            Assert.That(f.DraftPick, Is.EqualTo(sim.Offer(1) + 1), "the first valid pick locks in");
+            Assert.That(f.DraftPick, Is.EqualTo(Simulation.Offer(f, 1) + 1));
         }
+
+        static int[] Offers(Fighter f) => new[] { Simulation.Offer(f, 0), Simulation.Offer(f, 1), Simulation.Offer(f, 2) };
 
         [Test]
         public void BotsDraftAndBotMatchesReplayExactly()

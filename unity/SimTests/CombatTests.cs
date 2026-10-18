@@ -103,6 +103,28 @@ namespace Rats.SimTests
         }
 
         [Test]
+        public void BackpedalingIsSlowerThanSidestepping()
+        {
+            double Distance(Vec3 move, bool locked)
+            {
+                var sim = Create();
+                Place(sim, new Vec3(0, 0, 0), new Vec3(5, 0, 0));   // fighter 0 faces +X
+                sim.Fighters[0].LockedOn = locked;
+                var start = sim.Fighters[0].Position;
+                sim.Step(new InputFrame { MoveX = (float)move.X, MoveZ = (float)move.Z }, default); // one tick: a straight line sideways drifts away
+                return (sim.Fighters[0].Position - start).Length;
+            }
+            var t = new Tunables();
+            double full = t.MoveSpeed / Tunables.TickRate;
+
+            Assert.That(Distance(new Vec3(0, 0, 1), true), Is.EqualTo(full).Within(1e-9), "sidestep is full speed");
+            Assert.That(Distance(new Vec3(-1, 0, 0), true), Is.EqualTo(full * t.BackpedalMultiplier).Within(1e-9), "straight back is slow");
+            double diagonal = Distance(new Vec3(-1, 0, 1).Normalized, true);
+            Assert.That(diagonal, Is.GreaterThan(full * t.BackpedalMultiplier).And.LessThan(full), "diagonal back is in between");
+            Assert.That(Distance(new Vec3(-1, 0, 0), false), Is.EqualTo(full).Within(1e-9), "unlocked: you face where you run");
+        }
+
+        [Test]
         public void DefaultStaysRootedDuringStartup()
         {
             var sim = Create();

@@ -37,6 +37,8 @@ namespace Rats.Sim
         public bool FreeDashUsed;
         /// <summary>Carry the Flame: points left unspent at the end of the previous turn.</summary>
         public int CarriedPoints;
+        /// <summary>This fighter's own draft offers (UpgradeId, or Simulation.NoOffer). Never something already owned.</summary>
+        public int Offer0 = Simulation.NoOffer, Offer1 = Simulation.NoOffer, Offer2 = Simulation.NoOffer;
         /// <summary>Pick locked in during the current draft: UpgradeId + 1, or 0 for none yet.</summary>
         public int DraftPick;
 
@@ -81,7 +83,7 @@ namespace Rats.Sim
         public const int NoWinner = -1;
         public const int Draw = 2;
         public const int NoOffer = -1;
-        const int SnapshotVersion = 4; // 2: doubles, 3: lock-on timers, 4: upgrades and drafting
+        const int SnapshotVersion = 5; // 2: doubles, 3: lock-on timers, 4: upgrades and drafting, 5: per-player offers
 
         public readonly Tunables T;
         public readonly Arena Arena;
@@ -103,7 +105,6 @@ namespace Rats.Sim
         public bool DraftActive { get; private set; }
         public int DraftsThisRound { get; private set; }
         int freezesThisRound;
-        int offer0 = NoOffer, offer1 = NoOffer, offer2 = NoOffer;
         ulong rng;
         int nextProjectileId = 1;
 
@@ -129,8 +130,8 @@ namespace Rats.Sim
         public bool IsFrozen => Phase == Phase.Freeze;
         public Fighter Opponent(Fighter f) => Fighters[1 - f.Index];
 
-        /// <summary>Offer slot 0-2 of the current draft as an UpgradeId, or NoOffer.</summary>
-        public int Offer(int slot) => slot == 0 ? offer0 : slot == 1 ? offer1 : slot == 2 ? offer2 : NoOffer;
+        /// <summary>A fighter's offer slot 0-2 in the current draft as an UpgradeId, or NoOffer.</summary>
+        public static int Offer(Fighter f, int slot) => slot == 0 ? f.Offer0 : slot == 1 ? f.Offer1 : slot == 2 ? f.Offer2 : NoOffer;
 
         /// <summary>
         /// Advances one tick. In Freeze only the freeze timer (and draft picks) move; gameplay state is untouched.
@@ -254,29 +255,32 @@ namespace Rats.Sim
 
         // --- Drafting -------------------------------------------------------------------
 
-        /// <summary>Mirrored offers: 3 distinct upgrades that at least one fighter doesn't own yet.</summary>
+        /// <summary>Each fighter gets their own 3 random upgrades from the ones they don't own yet.</summary>
         void RollOffers()
         {
-            var candidates = new List<int>();
-            foreach (var u in Upgrades.Pool)
-                if (!(Fighters[0].Has(u) && Fighters[1].Has(u))) candidates.Add((int)u);
-            var picked = new int[3];
-            for (int slot = 0; slot < 3; slot++)
+            foreach (var f in Fighters)
             {
-                if (candidates.Count == 0) { picked[slot] = NoOffer; continue; }
-                int i = NextInt(candidates.Count);
-                picked[slot] = candidates[i];
-                candidates.RemoveAt(i);
+                var candidates = new List<int>();
+                foreach (var u in Upgrades.Pool)
+                    if (!f.Has(u)) candidates.Add((int)u);
+                var picked = new int[3];
+                for (int slot = 0; slot < 3; slot++)
+                {
+                    if (candidates.Count == 0) { picked[slot] = NoOffer; continue; }
+                    int i = NextInt(candidates.Count);
+                    picked[slot] = candidates[i];
+                    candidates.RemoveAt(i);
+                }
+                f.Offer0 = picked[0]; f.Offer1 = picked[1]; f.Offer2 = picked[2];
+                f.DraftPick = 0;
             }
-            offer0 = picked[0]; offer1 = picked[1]; offer2 = picked[2];
-            foreach (var f in Fighters) f.DraftPick = 0;
         }
 
         /// <summary>First valid pick locks in; picks of an upgrade you already own are ignored.</summary>
         void TakeDraftPick(Fighter f, InputFrame input)
         {
             if (f.DraftPick != 0 || input.DraftPick < 1 || input.DraftPick > 3) return;
-            int offer = Offer(input.DraftPick - 1);
+            int offer = Offer(f, input.DraftPick - 1);
             if (offer == NoOffer || f.Has((UpgradeId)offer)) return;
             f.DraftPick = offer + 1;
         }
@@ -288,15 +292,15 @@ namespace Rats.Sim
                 int chosen = f.DraftPick > 0 ? f.DraftPick - 1 : FirstValidOffer(f); // no pick in time: first valid offer
                 if (chosen != NoOffer) Grant(f, (UpgradeId)chosen);
                 f.DraftPick = 0;
+                f.Offer0 = f.Offer1 = f.Offer2 = NoOffer;
             }
-            offer0 = offer1 = offer2 = NoOffer;
         }
 
         int FirstValidOffer(Fighter f)
         {
             for (int slot = 0; slot < 3; slot++)
             {
-                int offer = Offer(slot);
+                int offer = Offer(f, slot);
                 if (offer != NoOffer && !f.Has((UpgradeId)offer)) return offer;
             }
             return NoOffer;
@@ -386,7 +390,10 @@ namespace Rats.Sim
                 {
                     var step = MoveVector(input);
                     if (step != Vec3.Zero)
-                        f.Position = Arena.Constrain(f.Position + step * (T.MoveSpeed * T.StartupWalkMultiplier * Tunables.TickDt), T.FighterRadius);
+                    {
+                        double speed = T.MoveSpeed * T.StartupWalkMultiplier * BackpedalFactor(step, f.Facing);
+                        f.Position = Arena.Constrain(f.Position + step * (speed * Tunables.TickDt), T.FighterRadius);
+                    }
                 }
                 return;
             }
@@ -394,7 +401,9 @@ namespace Rats.Sim
             var move = MoveVector(input);
             if (move != Vec3.Zero)
             {
-                f.Position = Arena.Constrain(f.Position + move * (T.MoveSpeed * Tunables.TickDt), T.FighterRadius);
+                // Locked on you face the opponent, so moving away is a slow backpedal; unlocked you face where you run.
+                double factor = f.LockedOn ? BackpedalFactor(move, FaceToward(f, Opponent(f))) : 1;
+                f.Position = Arena.Constrain(f.Position + move * (T.MoveSpeed * factor * Tunables.TickDt), T.FighterRadius);
                 if (!f.LockedOn) f.Facing = move.Normalized;
             }
             if (f.LockedOn) f.Facing = FaceToward(f, Opponent(f));
@@ -422,6 +431,13 @@ namespace Rats.Sim
                 if (visible) { f.LockedOn = true; f.RelockWindowTicks = 0; }
                 else f.RelockWindowTicks--;
             }
+        }
+
+        /// <summary>1 when moving forward or sideways, down to BackpedalMultiplier when moving straight back.</summary>
+        double BackpedalFactor(Vec3 move, Vec3 facing)
+        {
+            double back = -Vec3.Dot(move.Normalized, facing);
+            return back > 0 ? 1 - (1 - T.BackpedalMultiplier) * back : 1;
         }
 
         static Vec3 MoveVector(InputFrame input)
@@ -499,7 +515,7 @@ namespace Rats.Sim
             w.Write(Tick); w.Write(CombatTick); w.Write(Turn); w.Write((int)Phase);
             w.Write(PhaseTicksLeft); w.Write(Winner); w.Write(nextProjectileId);
             w.Write(DraftActive); w.Write(DraftsThisRound); w.Write(freezesThisRound);
-            w.Write(offer0); w.Write(offer1); w.Write(offer2); w.Write(rng);
+            w.Write(rng);
             foreach (var f in Fighters)
             {
                 Write(w, f.Position); Write(w, f.Facing);
@@ -509,6 +525,7 @@ namespace Rats.Sim
                 Write(w, f.ActionDir); w.Write(f.ActionHitLanded); w.Write(f.LockedOn);
                 w.Write(f.LockBlockedTicks); w.Write(f.RelockWindowTicks);
                 w.Write(f.Upgrades); w.Write(f.ActionsThisTurn); w.Write(f.FreeDashUsed); w.Write(f.CarriedPoints); w.Write(f.DraftPick);
+                w.Write(f.Offer0); w.Write(f.Offer1); w.Write(f.Offer2);
             }
             w.Write(Projectiles.Count);
             foreach (var p in Projectiles)
@@ -535,7 +552,7 @@ namespace Rats.Sim
             Tick = r.ReadInt32(); CombatTick = r.ReadInt32(); Turn = r.ReadInt32(); Phase = (Phase)r.ReadInt32();
             PhaseTicksLeft = r.ReadInt32(); Winner = r.ReadInt32(); nextProjectileId = r.ReadInt32();
             DraftActive = r.ReadBoolean(); DraftsThisRound = r.ReadInt32(); freezesThisRound = r.ReadInt32();
-            offer0 = r.ReadInt32(); offer1 = r.ReadInt32(); offer2 = r.ReadInt32(); rng = r.ReadUInt64();
+            rng = r.ReadUInt64();
             foreach (var f in Fighters)
             {
                 f.Position = ReadVec(r); f.Facing = ReadVec(r);
@@ -545,6 +562,7 @@ namespace Rats.Sim
                 f.ActionDir = ReadVec(r); f.ActionHitLanded = r.ReadBoolean(); f.LockedOn = r.ReadBoolean();
                 f.LockBlockedTicks = r.ReadInt32(); f.RelockWindowTicks = r.ReadInt32();
                 f.Upgrades = r.ReadUInt64(); f.ActionsThisTurn = r.ReadInt32(); f.FreeDashUsed = r.ReadBoolean(); f.CarriedPoints = r.ReadInt32(); f.DraftPick = r.ReadInt32();
+                f.Offer0 = r.ReadInt32(); f.Offer1 = r.ReadInt32(); f.Offer2 = r.ReadInt32();
             }
             int count = r.ReadInt32();
             Projectiles.Clear();

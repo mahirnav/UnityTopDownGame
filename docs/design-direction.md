@@ -10,7 +10,8 @@ Where the game is heading, from Nick's design discussions. Three levels, and the
   abilities come after P1 is played.
 - **P1 pool (8):** Heavy Blade, Long Reach, Big Bolt, Fortification, Free Step, Opening Move, Exhaustion Punish,
   Carry the Flame. Overclock was cut. Details in `docs/upgrades.md`.
-- **P1 is built:** drafting on the 1st/3rd/5th freeze (5 s), same 3 offers for both, keys 1-3, picks apply when the freeze ends, no pick = first offer you don't own. Damage is read when a hit lands, so frozen attacks get upgrades picked during the freeze.
+- **P1 is built:** drafting on the **first 3 freezes in a row** (5 s each), **each player gets their own 3 random offers, never something they already own** (the RNG difference can enable comebacks), keys 1-3, picks apply when the freeze ends, no pick = your first offer. Current upgrades are placeholders for balance and fit.
+- **Backpedaling is slower:** moving straight back from where you face is 60% speed (sideways full), so retreating can't outrun melee and circling is the way to evade. Unlocked, you face where you run (no penalty, but no lock-on). Damage is read when a hit lands, so frozen attacks get upgrades picked during the freeze.
 - **Facing:** an action's direction stays where it started (for now; see the facing model under Leaning).
 - **Startup walking and lock-on grace** exist as tunables, default off, to A/B in playtests.
 - **Online:** host-authoritative direct connection over Tailscale now; real matchmaking later.
@@ -23,14 +24,15 @@ Where the game is heading, from Nick's design discussions. Three levels, and the
   arc, dash distance, projectile size/speed). Structural swaps (dash → teleport) apply to new actions only.
 - HP upgrades give partial healing at most (e.g. +25 max, +10 now), to retest once we see how often lethal hits
   get frozen.
+- **Reroll** (redraw your 3 offers): parked as a possible starting ability or augment, not a default.
 - Draft choices should create tension between "helps right now" and "helps for the rest of the round"
   (mix of read-at-hit and future-only upgrades). Idea to try: reveal offers at turn start, pick at the freeze.
 
 **Rounds and progression**
 - Rounds about 90–120 s, ending through an escalating hazard (shrinking fire ring) rather than a visible round
   clock. The turn timer stays visible. A deterministic hard cap exists internally.
-- About 3 mid-round drafts per round, early (roughly alternate freezes), then none; mid-round upgrades reset
-  each round in the first experiment. No duplicates, mirrored offers, seeded draw.
+- 3 mid-round drafts per round on the first 3 freezes, then none; mid-round upgrades reset each round in the
+  first experiment. No duplicates, separate offers per player, seeded draw.
 - Three progression layers to explore later: **starting ability** (one, match-long, physical gladiator tools such
   as throwing axe, shield bash, net, grapple; not magic), **between-round augments** (big, risk/reward,
   build-defining, probably separate offers), **mid-round upgrades** (small). Mechanical replacements probably

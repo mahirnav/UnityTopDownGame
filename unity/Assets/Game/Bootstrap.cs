@@ -479,7 +479,7 @@ namespace Rats.Game
             return names.Count == 0 ? "none" : string.Join(", ", names);
         }
 
-        /// <summary>Draft screen: the same 3 offers for both players; keys 1-3 or click. Picks apply when the freeze ends.</summary>
+        /// <summary>Draft screen: your own 3 offers (the opponent's are hidden); keys 1-3 or click. Picks apply when the freeze ends.</summary>
         void DrawDraft(Fighter me, Fighter them)
         {
             const float w = 620, h = 300;
@@ -489,16 +489,16 @@ namespace Rats.Game
                                                : (them.DraftPick != 0 ? "Bot has picked." : "Bot is choosing..."));
             for (int slot = 0; slot < 3; slot++)
             {
-                int offer = Sim.Offer(slot);
+                int offer = Simulation.Offer(me, slot);
                 if (offer == Simulation.NoOffer) continue;
                 var u = (UpgradeId)offer;
-                string state = me.Has(u) ? "  (you have it)" : me.DraftPick == offer + 1 ? "  <- YOUR PICK" : "";
-                GUI.enabled = me.DraftPick == 0 && !me.Has(u);
+                string state = me.DraftPick == offer + 1 ? "  <- YOUR PICK" : "";
+                GUI.enabled = me.DraftPick == 0;
                 if (GUILayout.Button($"[{slot + 1}] {Upgrades.Name(u)}{state}\n{Upgrades.Describe(u, Sim.T)}", GUILayout.Height(58)))
                     keyboard.ChooseDraft(slot + 1);
                 GUI.enabled = true;
             }
-            GUILayout.Label(me.DraftPick == 0 ? "No pick when the timer ends = first offer you don't own." : "Locked in. Applies when time resumes.");
+            GUILayout.Label(me.DraftPick == 0 ? "No pick when the timer ends = your first offer. Your opponent has their own 3." : "Locked in. Applies when time resumes.");
             GUILayout.EndArea();
         }
 

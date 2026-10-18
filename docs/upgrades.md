@@ -17,8 +17,8 @@ P1 tests **mid-round drafting of core-action upgrades only** (no starting abilit
 
 Working rules for P1 (leaning, revisit after play): values are either **read when a hit lands** (damage,
 damage taken, HP, lifesteal) or **locked when an action starts** (timing, range, arc, dash distance, projectile
-size/speed). About 3 drafts per round on alternate freezes, upgrades reset each round, no duplicates,
-mirrored offers, seeded draw.
+size/speed). 3 drafts per round on the first 3 freezes, upgrades reset each round, each player gets their own 3
+offers from upgrades they don't own, seeded draw. **The current 8 are placeholders** to be rebalanced or replaced.
 
 ---
 
@@ -26,7 +26,7 @@ Tick `[x]` to **keep**, delete the line (or write `CUT`) to drop. Add notes inli
 values; every one becomes a tunable. P1 needs ~8; the rest can rotate in later.
 
 **Rules assumed for v0** (from the handoff, change any of them):
-- Drafts are mirrored for now (both see the same 3, pick blind). May not be mirrored in the final game.
+- ~~Drafts are mirrored~~ Decided 2026-10-18: each player gets their own 3 offers (never owned ones).
 - An upgrade applies to **future actions only**; an action already in progress keeps its old stats.
 - Upgrades last the whole round. Whether they reset between rounds is open (see questions at the end).
 
@@ -136,8 +136,8 @@ values; every one becomes a tunable. P1 needs ~8; the rest can rotate in later.
 1. **Stacking:** can you take the same upgrade twice? (Simplest: no duplicates; it also handles the "+1 AP" risk.)
 2. **Round reset:** do upgrades persist across the best-of-5 rounds or reset each round?
 3. **Pool draw:** pure random 3 from the remaining pool, or one from each category (offense / mobility / economy)?
-4. **Mirrored vs separate offers:** mirrored for P1; for later, separate offers make drafts feel personal but harder to balance.
-5. **Drafting every turn** is listed as a fatigue risk. Alternative: draft every other turn, or only after a hit lands.
+4. **Mirrored vs separate offers:** decided: separate offers per player.
+5. **Draft cadence:** decided: the first 3 freezes of each round, then none.
 
 ## How it would be built (for reference)
 Most S-sized upgrades are just changes to a per-fighter stats block computed from tunables plus picked

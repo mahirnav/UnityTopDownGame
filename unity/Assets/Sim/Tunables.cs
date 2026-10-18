@@ -25,6 +25,7 @@ namespace Rats.Sim
         public double FighterRadius = 0.4;
         public double MoveSpeed = 5;           // m/s, walking (not during actions)
         public double StartupWalkMultiplier = 0; // walk speed fraction during melee/ranged startup (0 = rooted)
+        public double BackpedalMultiplier = 0.6; // speed moving straight back from where you face (sideways = full)
 
         // Lock-on
         public int LockOnGraceTicks = 0;       // ticks of lost sight before lock breaks (0 = immediately)
@@ -67,7 +68,7 @@ namespace Rats.Sim
 
         // Drafting (P1): offers appear during some freezes; picks apply when the freeze ends
         public int DraftsPerRound = 3;
-        public int DraftInterval = 2;          // draft on every Nth freeze, starting with the first
+        public int DraftInterval = 1;          // draft on every Nth freeze, starting with the first (1 = first freezes in a row)
         public int DraftFreezeTicks = 300;     // draft freezes last longer (5 s) than plain ones
 
         // Upgrades

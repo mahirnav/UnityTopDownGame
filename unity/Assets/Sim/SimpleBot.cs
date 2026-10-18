@@ -5,7 +5,7 @@ namespace Rats.Sim
     /// <summary>
     /// Placeholder opponent so Nick can play alone. Just another input source: it reads the
     /// sim like a player looks at the screen and returns presses. Seeded so runs repeat.
-    /// Approach from far, back off when crowded, strafe otherwise; melee up close, shoot at mid range.
+    /// Approach from far, circle otherwise; melee up close, shoot at mid range.
     /// </summary>
     public sealed class SimpleBot : IInputSource
     {
@@ -38,7 +38,7 @@ namespace Rats.Sim
                     int slot = rng.Next(3);
                     for (int k = 0; k < 3; k++, slot = (slot + 1) % 3)
                     {
-                        int offer = sim.Offer(slot);
+                        int offer = Simulation.Offer(me, slot);
                         if (offer != Simulation.NoOffer && !me.Has((UpgradeId)offer)) { frame.DraftPick = (byte)(slot + 1); break; }
                     }
                     draftDecideTick = -1;
@@ -61,7 +61,7 @@ namespace Rats.Sim
                 nextStrafeFlip = tick + rng.Next(40, 120);
             }
             var side = new Vec3(-dir.Z, 0, dir.X) * strafeSign;
-            var move = dist > 7 ? dir : dist < 2.5 ? dir * -1 : side;
+            var move = dist > 7 ? dir : side; // circle rather than backpedal (backpedaling is slow)
             frame.MoveX = (float)move.X;
             frame.MoveZ = (float)move.Z;
 
