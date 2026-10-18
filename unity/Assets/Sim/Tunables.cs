@@ -37,6 +37,18 @@ namespace Rats.Sim
         public int RoundsToWin = 3;            // best of 5
         public int RoundBreakTicks = 180;      // pause between rounds
 
+        // Fire ring, downed, executions (P2). All timers run on combat time (they pause during freezes).
+        public int RoundMaxTicks = 5400;       // 90 s: the ring is fully closed; higher HP% wins if nobody was finished
+        public int FireStartTicks = 1800;      // the ring starts closing after 30 s
+        public int FirePulseTicks = 15;        // fire hurts 4 times a second
+        public int FireBaseDamage = 2;         // per pulse on first contact
+        public int FireRampTicks = 60;         // +1 damage per pulse for every second spent in the fire
+        public int DownedBleedTicks = 300;     // downed outside the fire: out after 5 s unless executed sooner
+        public int FireBleedTicks = 90;        // downed in the fire: out after 1.5 s
+        public double ExecuteRange = 1.8;      // m from center
+        public int ExecuteTicks = 45;          // execution length; once started it always completes; free (no point cost)
+        public int FinalStageTurnTicks = 0;    // turn length once the ring is closing (0 = same as TurnTicks)
+
         // Lock-on
         public int LockOnGraceTicks = 0;       // ticks of lost sight before lock breaks (0 = immediately)
         public int AutoRelockTicks = 0;        // after a break, lock returns if the target reappears within this (0 = off)
@@ -102,6 +114,7 @@ namespace Rats.Sim
                 case ActionKind.Melee: return Melee;
                 case ActionKind.Dash: return Dash;
                 case ActionKind.Ranged: return Ranged;
+                case ActionKind.Execute: return new ActionDef(0, ExecuteTicks, 1, 0);
                 default: throw new ArgumentOutOfRangeException(nameof(kind));
             }
         }

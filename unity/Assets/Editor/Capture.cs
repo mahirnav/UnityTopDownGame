@@ -92,6 +92,21 @@ namespace Rats.EditorTools
             }
             StepAndSync(bootstrap);
             Shot(bootstrap, dir, "look_round.png");
+
+            // The ring half closed and the opponent downed: fire band, downed pose, execute prompt.
+            var late = Tunables.Parse(File.ReadAllText(Path.Combine(Application.streamingAssetsPath, "tunables.txt")));
+            late.FireStartTicks = 0;
+            late.RoundMaxTicks = 900;
+            late.TurnTicks = 100000;
+            bootstrap.Build(late);
+            bootstrap.Inputs[0] = new ScriptedInput();
+            bootstrap.Inputs[1] = new ScriptedInput();
+            sim = bootstrap.Sim;
+            for (int i = 0; i < 420; i++) StepAndSync(bootstrap);
+            sim.Fighters[1].Hp = 0;
+            StepAndSync(bootstrap);
+            StepAndSync(bootstrap);
+            Shot(bootstrap, dir, "look_fire.png");
             return identical && caughtMidAction ? 0 : 2;
         }
 

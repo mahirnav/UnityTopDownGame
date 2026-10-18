@@ -17,6 +17,11 @@ Where the game is heading, from Nick's design discussions. Three levels, and the
 - **Backstabs (built, tunable):** melee from the target's 90° rear cone deals +50%, read when the hit lands. Possible because turning is no longer instant.
 - **Hit feedback and turn-end cue (built, visual only):** damage pop-ups (BACKSTAB!), flinch, camera shake, a 1 s icy tint + shrinking bar + 3 blips before each freeze, "FROZEN" flash and tone.
 - **Bot:** circles, dodges swings it sees coming, keeps its last point to punish, takes backstabs.
+- **P2 endgame (built, Nick's calls 2026-10-18):** at 0 HP you're **downed** (no actions or movement) and **bleed out**
+  after 5 s (1.5 s in fire) unless **executed**: walk up to a downed opponent and press melee. **Executions are free**
+  (no point cost) and always complete once started. A **fire ring** starts closing at 30 s and fully closes at **90 s**
+  (combat time); fire damage **ramps** the longer you stand in it and can down you. At the cap, higher HP% wins.
+  Optional `FinalStageTurnTicks` shortens turns once the ring closes (off by default). The bot avoids fire and executes.
 - **Visual pass 1 (built, all knobs in visuals.txt):** PS2-style render (360p point upscale, color banding + dither),
   icy desaturation during freezes, painted dusk sky, generated sand/stone textures, wall caps, pillar bases/caps, tiered
   stands with a crowd, torches with flickering light, banners; hit sparks, dash dust, bolt trails, swing-arc flash showing
@@ -73,8 +78,6 @@ Where the game is heading, from Nick's design discussions. Three levels, and the
 ## Open questions
 - Do upgrades or augments carry across rounds (full, one chosen, none)?
 - Do some freezes stay plain pauses, and how long are draft freezes?
-- Fire ring: forcing proximity vs killing directly; stacking damage; dash vs fire; does fire down or kill?
-- Do executions cost action points (an exhausted player might be unable to finish a downed opponent)?
 - What happens to a charge held across a freeze (if charging is approved)?
 - Host advantage online: the host plays with zero lag; dedicated server or deliberate host input delay later?
 

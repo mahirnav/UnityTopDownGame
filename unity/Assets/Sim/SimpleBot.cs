@@ -6,7 +6,7 @@ namespace Rats.Sim
     /// Placeholder opponent so Nick can play alone. Just another input source: it reads the sim like a
     /// player looks at the screen and returns presses. Seeded so runs repeat.
     /// Approaches from far and circles otherwise (backpedaling is slow). Dodges swings it sees coming,
-    /// keeps its last action point to punish, and loves a backstab.
+    /// keeps its last action point to punish, loves a backstab, stays out of the fire and finishes downed opponents.
     /// </summary>
     public sealed class SimpleBot : IInputSource
     {
@@ -47,7 +47,7 @@ namespace Rats.Sim
                 }
                 return frame;
             }
-            if (sim.Phase != Phase.Combat) return frame;
+            if (sim.Phase != Phase.Combat || me.Downed) return frame;
 
             var them = sim.Opponent(me);
             var to = (them.Position - me.Position).Flat;
@@ -65,6 +65,22 @@ namespace Rats.Sim
             }
             var side = new Vec3(-dir.Z, 0, dir.X) * strafeSign;
             var move = dist > 7 ? dir : side; // circle rather than backpedal
+
+            // A downed opponent: walk up and finish them (executions are free).
+            if (them.Downed)
+            {
+                frame.MoveX = (float)dir.X;
+                frame.MoveZ = (float)dir.Z;
+                if (!me.IsBusy && dist <= sim.T.ExecuteRange) frame.Melee = true;
+                return frame;
+            }
+
+            // Keep clear of the closing ring: head for the center when the fire is near.
+            if (sim.FireScale < 1 && !sim.Arena.InsideScaled(me.Position, sim.FireScale * 0.85))
+            {
+                var home = (Vec3.Zero - me.Position).Flat;
+                if (home.Length > 1e-4) move = home.Normalized;
+            }
             frame.MoveX = (float)move.X;
             frame.MoveZ = (float)move.Z;
             if (me.IsBusy || me.ActionPoints == 0) return frame;

@@ -47,6 +47,12 @@ namespace Rats.Game
                 seenHitTick[i] = f.LastHitTick;
                 if (f.LastHitTick < 0) continue;
                 var at = SimConvert.ToUnity(f.Position) + Vector3.up * 1.1f;
+                if (sim.InFire(f) && !f.LastHitBackstab)
+                {
+                    // Fire damage: small orange numbers, no shake or flinch (it ticks 4 times a second).
+                    hud.Popup(at + Vector3.up * 0.8f, f.LastHitDamage.ToString(), new Color(1f, 0.6f, 0.2f), 18);
+                    continue;
+                }
                 hud.Popup(at + Vector3.up * 1.1f,
                     f.LastHitBackstab ? $"{f.LastHitDamage}  BACKSTAB!" : f.LastHitDamage.ToString(),
                     f.LastHitBackstab ? new Color(1f, 0.85f, 0.2f) : i == local ? new Color(1f, 0.35f, 0.3f) : Color.white,

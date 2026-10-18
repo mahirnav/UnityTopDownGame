@@ -24,7 +24,7 @@ namespace Rats.Game
         readonly Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         readonly RectTransform root;
         readonly Camera worldCamera, uiCamera;
-        readonly Text roundText, timerText, bannerText, bannerSub, frozenText;
+        readonly Text roundText, timerText, bannerText, bannerSub, frozenText, promptText, ringText;
         readonly Image timerFill, cueTint;
         readonly Text myName, myHpText, myUpgrades, theirName, theirHpText, theirUpgrades;
         readonly Image myHp, theirHp;
@@ -35,6 +35,8 @@ namespace Rats.Game
         readonly Text[] cardTexts = new Text[3];
         readonly List<(Text text, Vector3 world, float born)> popups = new List<(Text, Vector3, float)>();
         float frozeAt = -10f;
+        float ringAt = -10f;
+        double lastFireScale = 1;
 
         public Action<int> OnPickDraft;
 
@@ -90,6 +92,8 @@ namespace Rats.Game
             bannerText = Txt(root, "Banner", 46, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), new Vector2(0, 120), new Vector2(1100, 60), Gold, true);
             bannerSub = Txt(root, "BannerSub", 20, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), new Vector2(0, 74), new Vector2(900, 30), Color.white, true);
             frozenText = Txt(root, "Frozen", 56, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), new Vector2(0, 170), new Vector2(800, 70), Ice, true);
+            promptText = Txt(root, "Prompt", 30, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), new Vector2(0, -40), new Vector2(1100, 44), new Color(1f, 0.45f, 0.3f), true);
+            ringText = Txt(root, "Ring", 40, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), new Vector2(0, 220), new Vector2(900, 54), new Color(1f, 0.55f, 0.2f), true);
 
             // Bottom center: draft cards.
             var draft = Img(root, "Draft", Panel, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 150), new Vector2(640, 270));
@@ -157,6 +161,23 @@ namespace Rats.Game
             SetBar(theirHp, theirHpText, them);
             theirUpgrades.text = Owned(them);
 
+            // Downed / execution prompts and the ring announcement.
+            string prompt = "";
+            if (sim.Phase == Phase.Combat || sim.Phase == Phase.Freeze)
+            {
+                if (me.Downed) prompt = $"YOU ARE DOWN   {me.DownedTicksLeft / 60f:F1}s";
+                else if (them.Downed)
+                    prompt = me.Action == ActionKind.Execute ? "EXECUTING..."
+                           : Vec3.DistanceXZ(me.Position, them.Position) <= sim.T.ExecuteRange ? "EXECUTE!   PRESS J"
+                           : $"{theirLabel.ToUpperInvariant()} IS DOWN - GET CLOSE AND PRESS J   {them.DownedTicksLeft / 60f:F1}s";
+            }
+            promptText.text = prompt;
+            if (lastFireScale >= 1 && sim.FireScale < 1) ringAt = Now;
+            lastFireScale = sim.FireScale;
+            float sinceRing = Now - ringAt;
+            ringText.text = sinceRing < 2.5f ? "THE RING CLOSES" : "";
+            ringText.color = new Color(1f, 0.55f, 0.2f, Mathf.Clamp01(2.5f - sinceRing));
+
             bannerText.text = bannerSub.text = "";
             string theirs = theirLabel.ToUpperInvariant();
             if (sim.Phase == Phase.RoundOver)
@@ -214,7 +235,7 @@ namespace Rats.Game
         static void SetBar(Image fill, Text label, Fighter f)
         {
             fill.rectTransform.anchorMax = new Vector2(Mathf.Clamp01(f.Hp / (float)f.MaxHp), 1f);
-            label.text = $"{Mathf.Max(0, f.Hp)} / {f.MaxHp}";
+            label.text = f.Downed ? $"DOWN  {f.DownedTicksLeft / 60f:F1}s" : $"{Mathf.Max(0, f.Hp)} / {f.MaxHp}";
         }
 
         Image Bar(RectTransform parent, Vector2 pos, Color color, out Text label)

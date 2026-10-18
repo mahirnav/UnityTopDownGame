@@ -45,5 +45,29 @@ namespace Rats.SimTests
             }
             Assert.That(sim.ActionLog.Exists(e => e.Fighter == 1 && e.Kind == ActionKind.Melee), Is.True);
         }
+
+        [Test]
+        public void BotFinishesADownedOpponent()
+        {
+            var sim = Create(t => t.TurnTicks = 10000);
+            Place(sim, new Vec3(0, 0, 0), new Vec3(4, 0, 0));
+            var bot = new SimpleBot(sim, 1, 4);
+            sim.Fighters[0].Hp = 0;
+            for (int i = 0; i < 400 && sim.Phase == Phase.Combat; i++) sim.Step(default, bot.Read(sim.Tick));
+            Assert.That(sim.ActionLog.Exists(e => e.Fighter == 1 && e.Kind == ActionKind.Execute), Is.True);
+            Assert.That(sim.Winner, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void BotStepsOutOfTheFire()
+        {
+            var sim = Create(t => { t.FireStartTicks = 0; t.RoundMaxTicks = 6000; t.TurnTicks = 10000; });
+            Run(sim, 600);                                       // ring at 90%
+            sim.Fighters[1].Position = new Vec3(13.2, 0, 0);     // standing in the fire
+            sim.Fighters[0].Position = new Vec3(13.2, 0, 3);     // opponent far from the center too
+            var bot = new SimpleBot(sim, 1, 5);
+            for (int i = 0; i < 120; i++) sim.Step(default, bot.Read(sim.Tick));
+            Assert.That(sim.InFire(sim.Fighters[1]), Is.False, "walked back inside the ring");
+        }
     }
 }

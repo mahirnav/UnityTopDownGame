@@ -79,4 +79,4 @@ Read `docs/design-direction.md` before design work: what's **approved**, what's 
 Treat leanings as direction to discuss, not rules. `docs/upgrades.md` has the P1 pool and the full candidate list.
 
 ## Roadmap
-P0 core turn loop (done, playtested) → networked 1v1 over Tailscale (built) → P1 mirrored drafting, 8 upgrades (built, current) → P2 downed/execute/fire ring → P3 hidden drafts, matchmaking.
+P0 core turn loop (done, playtested) → networked 1v1 over Tailscale (built) → P1 drafting, 8 upgrades (built) → P2 fire ring, downed, free executions, best of 5 (built, current) → P2 downed/execute/fire ring → P3 hidden drafts, matchmaking.

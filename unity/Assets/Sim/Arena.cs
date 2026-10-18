@@ -29,6 +29,14 @@ namespace Rats.Sim
             return (p.X * p.X) / (a * a) + (p.Z * p.Z) / (b * b) <= 1;
         }
 
+        /// <summary>True if the point is inside the oval scaled down by the given factor (the fire's safe zone).</summary>
+        public bool InsideScaled(Vec3 p, double scale)
+        {
+            if (scale <= 0) return false;
+            double a = RadiusX * scale, b = RadiusZ * scale;
+            return (p.X * p.X) / (a * a) + (p.Z * p.Z) / (b * b) <= 1;
+        }
+
         public bool HitsPillar(Vec3 p, double radius)
         {
             foreach (var c in Pillars)

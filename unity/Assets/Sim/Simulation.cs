@@ -6,7 +6,7 @@ namespace Rats.Sim
 {
     public enum Phase { Combat, Freeze, RoundOver, MatchOver }
 
-    public enum ActionKind { None, Melee, Dash, Ranged }
+    public enum ActionKind { None, Melee, Dash, Ranged, Execute }
 
     public sealed class Fighter
     {
@@ -45,6 +45,11 @@ namespace Rats.Sim
         public int LastHitTick = -1;
         public int LastHitDamage;
         public bool LastHitBackstab;
+        /// <summary>At 0 HP you're downed: no actions, no movement, bleeding out unless executed first.</summary>
+        public bool Downed;
+        public int DownedTicksLeft;
+        /// <summary>Consecutive combat ticks spent in the fire (fire damage ramps with it).</summary>
+        public int FireExposureTicks;
 
         public Fighter(int index) { Index = index; }
 
@@ -87,7 +92,7 @@ namespace Rats.Sim
         public const int NoWinner = -1;
         public const int Draw = 2;
         public const int NoOffer = -1;
-        const int SnapshotVersion = 6; // 2: doubles, 3: lock-on timers, 4: upgrades and drafting, 5: per-player offers, 6: match flow, last hit
+        const int SnapshotVersion = 7; // 2: doubles, 3: lock-on timers, 4: upgrades and drafting, 5: per-player offers, 6: match flow, last hit, 7: fire/downed
 
         public readonly Tunables T;
         public readonly Arena Arena;
@@ -109,6 +114,8 @@ namespace Rats.Sim
         /// <summary>Best of N: first to T.RoundsToWin round wins takes the match.</summary>
         public int Round { get; private set; } = 1;
         public int MatchWinner { get; private set; } = NoWinner;
+        /// <summary>Combat time elapsed in this round (drives the fire ring and the round cap).</summary>
+        public int RoundCombatTicks { get; private set; }
         int score0, score1;
         /// <summary>True during a freeze that offers upgrades.</summary>
         public bool DraftActive { get; private set; }
@@ -149,8 +156,12 @@ namespace Rats.Sim
                 f.CarriedPoints = 0;
                 f.DraftPick = 0;
                 f.Offer0 = f.Offer1 = f.Offer2 = NoOffer;
+                f.Downed = false;
+                f.DownedTicksLeft = 0;
+                f.FireExposureTicks = 0;
             }
             Projectiles.Clear();
+            RoundCombatTicks = 0;
             Winner = NoWinner;
             DraftActive = false;
             DraftsThisRound = 0;
@@ -220,17 +231,14 @@ namespace Rats.Sim
             MeleeHit(Fighters[0]);
             MeleeHit(Fighters[1]);
 
-            // Down checks
-            bool down0 = Fighters[0].Hp <= 0, down1 = Fighters[1].Hp <= 0;
-            if (down0 || down1)
-            {
-                EndRound(down0 && down1 ? Draw : down0 ? 1 : 0);
-                return;
-            }
+            // Fire, then down checks: downed, bleeding out, executions, the round cap
+            foreach (var f in Fighters) BurnInFire(f);
+            if (ResolveDowns()) return;
 
             // Action progress / turn timer
             foreach (var f in Fighters) AdvanceAction(f);
             CombatTick++;
+            RoundCombatTicks++;
             if (--PhaseTicksLeft <= 0) EndTurn();
         }
 
@@ -266,6 +274,88 @@ namespace Rats.Sim
             target.LastHitDamage = damage;
         }
 
+        /// <summary>Fraction of the arena still safe from fire: 1 before FireStartTicks, 0 at RoundMaxTicks.</summary>
+        public double FireScale
+        {
+            get
+            {
+                if (RoundCombatTicks < T.FireStartTicks) return 1;
+                double span = Math.Max(1, T.RoundMaxTicks - T.FireStartTicks);
+                return Math.Max(0, 1 - (RoundCombatTicks - T.FireStartTicks) / span);
+            }
+        }
+
+        public bool InFire(Fighter f) => FireScale < 1 && !Arena.InsideScaled(f.Position, FireScale);
+
+        /// <summary>Fire pulses ramp with continuous exposure; stepping out resets it.</summary>
+        void BurnInFire(Fighter f)
+        {
+            if (!InFire(f)) { f.FireExposureTicks = 0; return; }
+            f.FireExposureTicks++;
+            if (f.Downed || RoundCombatTicks % Math.Max(1, T.FirePulseTicks) != 0) return;
+            int damage = T.FireBaseDamage + f.FireExposureTicks / Math.Max(1, T.FireRampTicks);
+            f.Hp -= damage;
+            f.LastHitTick = Tick;
+            f.LastHitDamage = damage;
+            f.LastHitBackstab = false;
+        }
+
+        void StartExecution(Fighter f, Fighter target)
+        {
+            f.Action = ActionKind.Execute;
+            f.Frames = new ActionDef(0, Math.Max(1, T.ExecuteTicks), 1, 0); // free; the kill lands on the active tick
+            f.ActionTick = 0;
+            f.ActionHitLanded = false;
+            f.Facing = FaceToward(f, target);
+            ActionLog.Add(new ActionEvent(Tick, CombatTick, Turn, f.Index, ActionKind.Execute));
+        }
+
+        /// <summary>
+        /// New downs, executions landing, bleed-outs, and the round cap. Returns true if the round ended.
+        /// An execution that has started always completes, even if the executioner is downed meanwhile.
+        /// </summary>
+        bool ResolveDowns()
+        {
+            foreach (var f in Fighters)
+            {
+                if (f.Downed || f.Hp > 0) continue;
+                f.Downed = true;
+                f.Hp = 0;
+                f.DownedTicksLeft = InFire(f) ? T.FireBleedTicks : T.DownedBleedTicks;
+                if (f.Action != ActionKind.Execute) f.Action = ActionKind.None;
+            }
+
+            bool executed0 = false, executed1 = false;
+            foreach (var f in Fighters)
+                if (f.Action == ActionKind.Execute && f.Frames.IsActive(f.ActionTick) && Opponent(f).Downed)
+                {
+                    if (f.Index == 0) executed1 = true; else executed0 = true;
+                }
+
+            bool out0 = executed0, out1 = executed1;
+            foreach (var f in Fighters)
+            {
+                if (!f.Downed) continue;
+                if (InFire(f)) f.DownedTicksLeft = Math.Min(f.DownedTicksLeft, T.FireBleedTicks);
+                if (--f.DownedTicksLeft <= 0) { if (f.Index == 0) out0 = true; else out1 = true; }
+            }
+            if (out0 || out1)
+            {
+                EndRound(out0 && out1 ? Draw : out0 ? 1 : 0);
+                return true;
+            }
+
+            if (RoundCombatTicks + 1 >= T.RoundMaxTicks)
+            {
+                // Ring fully closed and nobody finished: higher HP% wins (downed counts as 0).
+                long hp0 = Fighters[0].Downed ? 0 : (long)Fighters[0].Hp * Fighters[1].MaxHp;
+                long hp1 = Fighters[1].Downed ? 0 : (long)Fighters[1].Hp * Fighters[0].MaxHp;
+                EndRound(hp0 == hp1 ? Draw : hp0 > hp1 ? 0 : 1);
+                return true;
+            }
+            return false;
+        }
+
         void EndRound(int winner)
         {
             Winner = winner;
@@ -285,7 +375,7 @@ namespace Rats.Sim
         {
             Turn++;
             Phase = Phase.Combat;
-            PhaseTicksLeft = T.TurnTicks;
+            PhaseTicksLeft = T.FinalStageTurnTicks > 0 && RoundCombatTicks >= T.FireStartTicks ? T.FinalStageTurnTicks : T.TurnTicks;
             DraftActive = false;
             foreach (var f in Fighters)
             {
@@ -400,6 +490,7 @@ namespace Rats.Sim
 
         void HandleInput(Fighter f, InputFrame input)
         {
+            if (f.Downed) return;
             var opponent = Opponent(f);
             if (input.ToggleLock)
             {
@@ -417,6 +508,11 @@ namespace Rats.Sim
             }
 
             if (f.IsBusy) return; // no cancels, no buffering
+            if (input.Melee && opponent.Downed && Vec3.DistanceXZ(f.Position, opponent.Position) <= T.ExecuteRange)
+            {
+                StartExecution(f, opponent);
+                return;
+            }
             var kind = input.Melee ? ActionKind.Melee
                      : input.Ranged ? ActionKind.Ranged
                      : input.Dash ? ActionKind.Dash
@@ -448,6 +544,7 @@ namespace Rats.Sim
 
         void Move(Fighter f, InputFrame input)
         {
+            if (f.Downed || f.Action == ActionKind.Execute) return;
             if (f.Action == ActionKind.Dash)
             {
                 if (f.Frames.IsActive(f.ActionTick))
@@ -570,6 +667,7 @@ namespace Rats.Sim
         bool ProjectileHit(Projectile p)
         {
             var target = Fighters[1 - p.Owner];
+            if (target.Downed) return false; // bolts fly over a downed fighter
             if (Vec3.DistanceXZ(p.Position, target.Position) > p.Radius + T.FighterRadius) return false;
             ApplyHit(Fighters[p.Owner], ActionKind.Ranged, target);
             return true;
@@ -579,6 +677,7 @@ namespace Rats.Sim
         {
             if (f.Action != ActionKind.Melee || f.ActionHitLanded || !f.Frames.IsActive(f.ActionTick)) return;
             var target = Opponent(f);
+            if (target.Downed) return;
             var to = (target.Position - f.Position).Flat;
             double dist = to.Length;
             if (dist > f.ActionReach + T.FighterRadius) return;
@@ -606,7 +705,7 @@ namespace Rats.Sim
             w.Write(PhaseTicksLeft); w.Write(Winner); w.Write(nextProjectileId);
             w.Write(DraftActive); w.Write(DraftsThisRound); w.Write(freezesThisRound);
             w.Write(rng);
-            w.Write(Round); w.Write(MatchWinner); w.Write(score0); w.Write(score1);
+            w.Write(Round); w.Write(MatchWinner); w.Write(score0); w.Write(score1); w.Write(RoundCombatTicks);
             foreach (var f in Fighters)
             {
                 Write(w, f.Position); Write(w, f.Facing);
@@ -618,6 +717,7 @@ namespace Rats.Sim
                 w.Write(f.Upgrades); w.Write(f.ActionsThisTurn); w.Write(f.FreeDashUsed); w.Write(f.CarriedPoints); w.Write(f.DraftPick);
                 w.Write(f.Offer0); w.Write(f.Offer1); w.Write(f.Offer2);
                 w.Write(f.LastHitTick); w.Write(f.LastHitDamage); w.Write(f.LastHitBackstab);
+                w.Write(f.Downed); w.Write(f.DownedTicksLeft); w.Write(f.FireExposureTicks);
             }
             w.Write(Projectiles.Count);
             foreach (var p in Projectiles)
@@ -645,7 +745,7 @@ namespace Rats.Sim
             PhaseTicksLeft = r.ReadInt32(); Winner = r.ReadInt32(); nextProjectileId = r.ReadInt32();
             DraftActive = r.ReadBoolean(); DraftsThisRound = r.ReadInt32(); freezesThisRound = r.ReadInt32();
             rng = r.ReadUInt64();
-            Round = r.ReadInt32(); MatchWinner = r.ReadInt32(); score0 = r.ReadInt32(); score1 = r.ReadInt32();
+            Round = r.ReadInt32(); MatchWinner = r.ReadInt32(); score0 = r.ReadInt32(); score1 = r.ReadInt32(); RoundCombatTicks = r.ReadInt32();
             foreach (var f in Fighters)
             {
                 f.Position = ReadVec(r); f.Facing = ReadVec(r);
@@ -657,6 +757,7 @@ namespace Rats.Sim
                 f.Upgrades = r.ReadUInt64(); f.ActionsThisTurn = r.ReadInt32(); f.FreeDashUsed = r.ReadBoolean(); f.CarriedPoints = r.ReadInt32(); f.DraftPick = r.ReadInt32();
                 f.Offer0 = r.ReadInt32(); f.Offer1 = r.ReadInt32(); f.Offer2 = r.ReadInt32();
                 f.LastHitTick = r.ReadInt32(); f.LastHitDamage = r.ReadInt32(); f.LastHitBackstab = r.ReadBoolean();
+                f.Downed = r.ReadBoolean(); f.DownedTicksLeft = r.ReadInt32(); f.FireExposureTicks = r.ReadInt32();
             }
             int count = r.ReadInt32();
             Projectiles.Clear();

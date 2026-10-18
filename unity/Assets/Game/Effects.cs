@@ -12,6 +12,11 @@ namespace Rats.Game
     {
         readonly ParticleSystem sparks, dust;
         readonly GameObject[] arcs = new GameObject[2];
+        const int FireSegments = 96;
+        readonly Mesh fireMesh;
+        readonly GameObject fireRing;
+        readonly Vector3[] fireVerts = new Vector3[(FireSegments + 1) * 2];
+        readonly Color[] fireColors = new Color[(FireSegments + 1) * 2];
         readonly VisualSettings look;
         bool paused;
 
@@ -20,6 +25,24 @@ namespace Rats.Game
             this.look = look;
             sparks = MakeSystem(world, "Sparks", "Legacy Shaders/Particles/Additive");
             dust = MakeSystem(world, "Dust", "Legacy Shaders/Particles/Alpha Blended");
+
+            // Fire ring: a band from the safe zone's edge out to the wall, rebuilt as the ring closes.
+            fireMesh = new Mesh { name = "FireRing" };
+            fireMesh.MarkDynamic();
+            var tris = new int[FireSegments * 6];
+            for (int s = 0; s < FireSegments; s++)
+            {
+                int i = s * 2;
+                tris[s * 6] = i; tris[s * 6 + 1] = i + 1; tris[s * 6 + 2] = i + 2;
+                tris[s * 6 + 3] = i + 1; tris[s * 6 + 4] = i + 3; tris[s * 6 + 5] = i + 2;
+            }
+            fireMesh.vertices = fireVerts;
+            fireMesh.triangles = tris;
+            fireRing = new GameObject("FireRing");
+            fireRing.transform.SetParent(world, false);
+            fireRing.AddComponent<MeshFilter>().sharedMesh = fireMesh;
+            fireRing.AddComponent<MeshRenderer>().sharedMaterial = new Material(Shader.Find("Sprites/Default"));
+            fireRing.SetActive(false);
         }
 
         public void Sparks(Vector3 at, bool backstab)
@@ -41,6 +64,7 @@ namespace Rats.Game
 
         public void Sync(Simulation sim)
         {
+            SyncFire(sim);
             bool frozen = sim.Phase != Phase.Combat;
             if (frozen != paused)
             {
@@ -77,6 +101,37 @@ namespace Rats.Game
                     }
                 }
             }
+        }
+
+        void SyncFire(Simulation sim)
+        {
+            double scale = sim.FireScale;
+            fireRing.SetActive(scale < 1);
+            if (scale >= 1) return;
+            float rx = (float)sim.Arena.RadiusX, rz = (float)sim.Arena.RadiusZ, s = (float)scale;
+            float t = paused ? 0f : Time.realtimeSinceStartup; // flames hold still while time is frozen
+            for (int k = 0; k <= FireSegments; k++)
+            {
+                float a = k * Mathf.PI * 2f / FireSegments;
+                float c = Mathf.Cos(a), sn = Mathf.Sin(a);
+                float flicker = paused ? 0.5f : Mathf.PerlinNoise(k * 0.35f, t * 3f);
+                fireVerts[k * 2] = new Vector3(c * rx * s, 0.04f, sn * rz * s);
+                fireVerts[k * 2 + 1] = new Vector3(c * (rx + 0.3f), 0.04f, sn * (rz + 0.3f));
+                fireColors[k * 2] = new Color(1f, 0.55f + 0.3f * flicker, 0.12f, 0.95f);
+                fireColors[k * 2 + 1] = new Color(0.55f, 0.08f, 0.03f, 0.75f);
+                if (!paused && Random.value < 0.08f)
+                    sparks.Emit(new ParticleSystem.EmitParams
+                    {
+                        position = fireVerts[k * 2] + Vector3.up * 0.1f,
+                        velocity = new Vector3(Random.Range(-0.3f, 0.3f), Random.Range(1.5f, 3f), Random.Range(-0.3f, 0.3f)),
+                        startColor = new Color(1f, 0.5f + Random.value * 0.3f, 0.1f),
+                        startSize = Random.Range(0.06f, 0.14f),
+                        startLifetime = Random.Range(0.4f, 0.9f),
+                    }, 1);
+            }
+            fireMesh.vertices = fireVerts;
+            fireMesh.colors = fireColors;
+            fireMesh.RecalculateBounds();
         }
 
         static ParticleSystem MakeSystem(Transform parent, string name, string shader)

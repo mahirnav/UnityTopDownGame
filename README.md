@@ -4,7 +4,8 @@ Multiplayer PvP third-person game (repo: UnityThirdPersonGame). 1v1 gladiator ar
 
 Current state: **early prototype.** You (red) against a bot or a friend (blue) in an oval pit with 4 pillars.
 Best-of-5 matches; 8 s turns with 3 action points; time freezes mid-action between turns; upgrade drafts on the
-first 3 freezes of each round; backstabs, lock-on, online play over Tailscale.
+first 3 freezes of each round; backstabs, lock-on; at 0 HP you're downed and can be executed; a fire ring closes the
+arena by 90 s; online play over Tailscale.
 See CLAUDE.md for the architecture rules.
 
 ## Layout

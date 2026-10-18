@@ -23,6 +23,18 @@ BackstabPercent = 50        # bonus melee damage from behind (0 = off)
 RoundsToWin = 3             # first to 3 round wins takes the match (best of 5)
 RoundBreakTicks = 180       # 3 s pause between rounds
 
+# --- Fire ring, downed, executions (all on combat time; paused during freezes) ---
+RoundMaxTicks = 5400        # 90 s: ring fully closed; higher HP% wins if nobody was finished
+FireStartTicks = 1800       # ring starts closing after 30 s
+FirePulseTicks = 15         # fire hurts 4x per second
+FireBaseDamage = 2          # per pulse on first contact
+FireRampTicks = 60          # +1 per pulse for every second spent in the fire
+DownedBleedTicks = 300      # downed: out after 5 s unless executed first
+FireBleedTicks = 90         # downed in the fire: out after 1.5 s
+ExecuteRange = 1.8          # walk up to a downed opponent and press melee
+ExecuteTicks = 45           # execution length (free; once started it completes)
+FinalStageTurnTicks = 0     # turn length once the ring closes (0 = same as TurnTicks); try 300
+
 # --- Lock-on ---
 LockOnGraceTicks = 0        # ticks of lost sight before lock breaks: 0 = instant (current), try 6-9
 AutoRelockTicks = 0         # lock returns by itself if the target reappears within this: 0 = off, try 30

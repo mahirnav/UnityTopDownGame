@@ -70,9 +70,11 @@ namespace Rats.Game
                 float progress = (float)tick / def.Total;
                 lean = fighter.Action == ActionKind.Dash ? 25f
                      : fighter.Action == ActionKind.Melee ? Mathf.Sin(progress * Mathf.PI) * 35f
+                     : fighter.Action == ActionKind.Execute ? Mathf.Sin(progress * Mathf.PI) * 50f
                      : 0f;
             }
             if (Time.realtimeSinceStartup < flinchUntil) lean -= 18f;
+            if (fighter.Downed) { lean = 82f; color *= 0.55f; } // lying in the sand
             body.localRotation *= Quaternion.Euler(lean, 0f, 0f);
 
             if (fighter.Hp < lastHp && lastHp != int.MaxValue) flashUntil = Time.realtimeSinceStartup + HitFlashSeconds;
