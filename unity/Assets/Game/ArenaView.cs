@@ -12,7 +12,7 @@ namespace Rats.Game
     /// </summary>
     static class ArenaView
     {
-        const int WallSegments = 72;
+        const int WallSegments = 96;
         const float WallHeight = 3.5f, WallThickness = 0.6f, PostHeight = 6f;
         static readonly Color SkyHorizon = new Color(0.96f, 0.52f, 0.26f);
         static readonly Color SkyMid = new Color(0.86f, 0.34f, 0.24f);
@@ -21,7 +21,7 @@ namespace Rats.Game
 
         public static void Build(Transform world, Arena arena, VisualSettings look)
         {
-            var cobbles = Lit(ProcTex.Cobbles(new Color(0.66f, 0.50f, 0.33f), 31), new Vector2(11f, 8f));
+            var cobbles = Lit(ProcTex.Cobbles(new Color(0.66f, 0.50f, 0.33f), 31), new Vector2((float)arena.RadiusX * 0.8f, (float)arena.RadiusZ * 0.8f)); // same cobble size at any arena size
             var dirt = Lit(ProcTex.Sand(new Color(0.34f, 0.24f, 0.18f), new Color(0.25f, 0.17f, 0.13f), 12), new Vector2(40f, 40f));
             var plaster = Lit(ProcTex.Plaster(new Color(0.66f, 0.55f, 0.42f), 41), new Vector2(1f, 2.5f));
             var trim = Lit(ProcTex.Blocks(new Color(0.34f, 0.33f, 0.34f), 1, 2, 22), Vector2.one);
@@ -37,7 +37,8 @@ namespace Rats.Game
             Patches(world, arena);
 
             Walls(world, arena, plaster, trim);
-            int[] buttressAt = { 4, 13, 22, 31, 40, 49, 58, 67 };
+            var buttressAt = new int[8];
+            for (int k = 0; k < buttressAt.Length; k++) buttressAt[k] = k * WallSegments / buttressAt.Length + WallSegments / 16; // evenly spaced, clear of the gate
             foreach (int seg in buttressAt) Buttress(world, arena, seg, roundStone, trim);
             Gate(world, arena, roundStone, iron);
             Banners(world, arena);
@@ -205,7 +206,8 @@ namespace Rats.Game
         static void Banners(Transform world, Arena arena)
         {
             var cloth = new[] { Lit(null, Vector2.one, new Color(0.86f, 0.38f, 0.12f)), Lit(null, Vector2.one, new Color(0.5f, 0.1f, 0.07f)) };
-            int[] at = { 9, 18, 27, 45, 54, 63 };
+            var at = new int[6];
+            for (int k = 0; k < at.Length; k++) at[k] = (k < 3 ? k + 1 : k + 2) * WallSegments / 8; // between buttresses, skipping the gate
             for (int i = 0; i < at.Length; i++)
             {
                 var p = EllipsePoint(arena, at[i], -0.03f);
@@ -305,7 +307,7 @@ namespace Rats.Game
         /// <summary>Three tiers of stone stands above the wall, with a crowd of simple silhouettes.</summary>
         static void Stands(Transform world, Arena arena, Material stone, int crowd)
         {
-            const int segments = 48;
+            const int segments = 64;
             for (int tier = 0; tier < 3; tier++)
             {
                 float outset = 1.2f + tier * 1.6f, height = WallHeight + 0.3f + tier * 1.0f;

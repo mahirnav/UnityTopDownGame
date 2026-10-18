@@ -2,7 +2,7 @@
 # 60 ticks = 1 second. Distances in meters, speeds in meters/second.
 
 # --- Turn structure ---
-TurnTicks = 480             # combat time per turn (8 s)
+TurnTicks = 780             # combat time per turn (13 s)
 FreezeTicks = 180           # frozen pause between turns (3 s)
 ActionPointsPerTurn = 3
 
@@ -67,12 +67,12 @@ ProjectileLifetimeTicks = 180
 ProjectileSpawnHeight = 1
 
 # --- Arena (oval pit) ---
-ArenaRadiusX = 14
-ArenaRadiusZ = 10
-PillarRadius = 0.9
-PillarOffsetX = 5.5         # 4 pillars at (+-X, +-Z)
-PillarOffsetZ = 4
-StartOffsetX = 9            # fighters start at (-X, 0) and (+X, 0)
+ArenaRadiusX = 24           # WoW-arena scale: 48 x 34 m
+ArenaRadiusZ = 17
+PillarRadius = 1.1
+PillarOffsetX = 9.5         # 4 pillars at (+-X, +-Z)
+PillarOffsetZ = 6.8
+StartOffsetX = 15           # fighters start at (-X, 0) and (+X, 0)
 
 # --- Drafting (P1) ---
 DraftsPerRound = 3          # upgrade drafts per round

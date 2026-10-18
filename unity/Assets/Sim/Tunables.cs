@@ -16,7 +16,7 @@ namespace Rats.Sim
         public const double TickDt = 1.0 / TickRate;
 
         // Turn structure
-        public int TurnTicks = 480;            // 8 s of combat
+        public int TurnTicks = 780;            // 13 s of combat
         public int FreezeTicks = 180;          // 3 s frozen
         public int ActionPointsPerTurn = 3;
 
@@ -81,12 +81,12 @@ namespace Rats.Sim
         public double ProjectileSpawnHeight = 1;
 
         // Arena (oval pit, origin at center)
-        public double ArenaRadiusX = 14;
-        public double ArenaRadiusZ = 10;
-        public double PillarRadius = 0.9;
-        public double PillarOffsetX = 5.5;     // 4 pillars at (+-X, +-Z)
-        public double PillarOffsetZ = 4;
-        public double StartOffsetX = 9;        // fighters start at (-X, 0) and (+X, 0)
+        public double ArenaRadiusX = 24;
+        public double ArenaRadiusZ = 17;
+        public double PillarRadius = 1.1;
+        public double PillarOffsetX = 9.5;     // 4 pillars at (+-X, +-Z)
+        public double PillarOffsetZ = 6.8;
+        public double StartOffsetX = 15;       // fighters start at (-X, 0) and (+X, 0)
 
         // Drafting (P1): offers appear during some freezes; picks apply when the freeze ends
         public int DraftsPerRound = 3;

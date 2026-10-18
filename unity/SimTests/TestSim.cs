@@ -11,7 +11,9 @@ namespace Rats.SimTests
         {
             // Legacy scenario defaults: no drafting, instant turning, no startup tracking, no backstabs.
             // Tests that cover those features turn them on.
-            var t = new Tunables { DraftsPerRound = 0, IdleTurnRateDeg = 0, StartupTurnRateDeg = 0, BackstabPercent = 0 };
+            // Scenario tests use the original 28 x 20 m arena geometry so their positions stay meaningful.
+            var t = new Tunables { DraftsPerRound = 0, IdleTurnRateDeg = 0, StartupTurnRateDeg = 0, BackstabPercent = 0,
+                                   ArenaRadiusX = 14, ArenaRadiusZ = 10, PillarRadius = 0.9, PillarOffsetX = 5.5, PillarOffsetZ = 4, StartOffsetX = 9 };
             tweak?.Invoke(t);
             return new Simulation(t, seed);
         }

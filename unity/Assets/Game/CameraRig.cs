@@ -10,7 +10,7 @@ namespace Rats.Game
     public sealed class CameraRig
     {
         // Shoulder offset keeps your own capsule from hiding the opponent and your projectiles.
-        const float Distance = 5.5f, Height = 2.6f, Shoulder = 1.3f, FollowRate = 8f, OrbitDegreesPerSecond = 120f;
+        const float Shoulder = 1.3f, FollowRate = 8f, OrbitDegreesPerSecond = 120f;
 
         public readonly Camera Camera;
         float yaw;
@@ -22,11 +22,14 @@ namespace Rats.Game
         public void AddShake(float amount) => shake = Mathf.Max(shake, amount);
 
         readonly float wallX, wallZ;
+        readonly float Distance, Height;
 
-        /// <summary>The arena's oval radii keep the camera inside the (tall) walls.</summary>
-        public CameraRig(Camera camera, Arena arena)
+        /// <summary>The arena's oval radii keep the camera inside the (tall) walls; distance/height come from visuals.txt.</summary>
+        public CameraRig(Camera camera, Arena arena, VisualSettings look)
         {
             Camera = camera;
+            Distance = look.CameraDistance;
+            Height = look.CameraHeight;
             wallX = (float)arena.RadiusX - 0.9f;
             wallZ = (float)arena.RadiusZ - 0.9f;
         }

@@ -114,7 +114,7 @@ namespace Rats.Game
             cam.cullingMask = ~(1 << uiLayer);
             retro = cam.gameObject.AddComponent<RetroEffect>();
             retro.Look = look;
-            cameraRig = new CameraRig(cam, Sim.Arena);
+            cameraRig = new CameraRig(cam, Sim.Arena, look);
 
             // The HUD gets its own camera so the retro effect leaves text crisp.
             uiCamera = new GameObject("UICamera").AddComponent<Camera>();

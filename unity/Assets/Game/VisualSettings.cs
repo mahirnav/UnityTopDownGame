@@ -24,7 +24,11 @@ namespace Rats.Game
         public float FogStart = 14f;
         public float FogEnd = 70f;
         public float SunIntensity = 1.3f;
-        public int CrowdSize = 160;            // spectator silhouettes around the pit
+        public int CrowdSize = 260;            // spectator silhouettes around the pit
+
+        // Camera
+        public float CameraDistance = 7f;      // behind the fighter; farther feels calmer and shows more of the arena
+        public float CameraHeight = 3.2f;
 
         // Combat effects
         public float ShakeScale = 1f;          // camera shake multiplier (0 = off)

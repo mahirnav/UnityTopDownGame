@@ -14,7 +14,11 @@ Saturation = 1.12          # 1 = unchanged
 FogStart = 14
 FogEnd = 70
 SunIntensity = 1.3
-CrowdSize = 160            # spectator silhouettes around the pit
+CrowdSize = 260            # spectator silhouettes around the pit
+
+# --- Camera ---
+CameraDistance = 7         # behind the fighter (m): farther feels calmer and shows more of the arena
+CameraHeight = 3.2
 
 # --- Combat effects ---
 ShakeScale = 1             # camera shake multiplier (0 = off)
